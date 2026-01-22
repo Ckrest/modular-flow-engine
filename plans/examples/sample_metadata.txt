@@ -1,0 +1,5 @@
+alpha|first
+beta|second
+gamma|third
+delta|fourth
+epsilon|fifth

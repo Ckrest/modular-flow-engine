@@ -1,0 +1,177 @@
+{
+  "name": "evaluate_yesno",
+  "type": "composite",
+  "description": "Ask a yes/no question about an item and compare the answer to ground truth",
+
+  "inputs": {
+    "question_template": {
+      "type": "string",
+      "required": true,
+      "description": "Question template with {item} placeholder"
+    },
+    "item": {
+      "type": "string",
+      "required": true,
+      "description": "Item to substitute into the question"
+    },
+    "ground_truth": {
+      "type": "dict",
+      "required": true,
+      "description": "Dictionary mapping items to expected boolean values"
+    },
+    "system_prompt": {
+      "type": "string",
+      "required": false,
+      "description": "System prompt for the LLM"
+    }
+  },
+
+  "outputs": {
+    "is_correct": {
+      "type": "boolean",
+      "description": "Whether the model's answer matches ground truth"
+    },
+    "answer": {
+      "type": "string",
+      "description": "Parsed answer (yes/no/unknown)"
+    },
+    "is_yes": {
+      "type": "boolean",
+      "description": "Whether the answer was yes"
+    },
+    "expected": {
+      "type": "boolean",
+      "description": "Expected answer from ground truth"
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Confidence level of the parse"
+    },
+    "raw_response": {
+      "type": "string",
+      "description": "Raw LLM response"
+    },
+    "final_prompt": {
+      "type": "string",
+      "description": "The interpolated prompt that was sent"
+    }
+  },
+
+  "config": {
+    "model": {
+      "type": "string",
+      "default": "meta-llama/llama-3.3-70b-instruct",
+      "description": "OpenRouter model to use"
+    },
+    "temperature": {
+      "type": "float",
+      "default": 0.0,
+      "description": "LLM temperature"
+    },
+    "strict_parse": {
+      "type": "boolean",
+      "default": false,
+      "description": "Require exact yes/no match"
+    }
+  },
+
+  "internal": {
+    "components": {
+      "build_prompt": {
+        "type": "transform/template",
+        "config": {}
+      },
+      "ask_model": {
+        "type": "transform/openrouter",
+        "config": {
+          "model": "meta-llama/llama-3.3-70b-instruct",
+          "temperature": 0.0,
+          "max_tokens": 10
+        }
+      },
+      "parse_answer": {
+        "type": "transform/yesno_parser",
+        "config": {
+          "strict": false
+        }
+      },
+      "lookup_expected": {
+        "type": "transform/lookup",
+        "config": {
+          "default": null
+        }
+      },
+      "check_correct": {
+        "type": "transform/compare",
+        "config": {
+          "mode": "equals",
+          "coerce_bool": true
+        }
+      }
+    },
+
+    "flow": [
+      {
+        "call": "build_prompt",
+        "inputs": {
+          "template": "{question_template}",
+          "item": "{item}"
+        },
+        "outputs": {
+          "result": "final_prompt"
+        }
+      },
+      {
+        "call": "ask_model",
+        "inputs": {
+          "prompt": "{final_prompt}",
+          "system_prompt": "{system_prompt}"
+        },
+        "outputs": {
+          "response": "raw_response"
+        }
+      },
+      {
+        "call": "parse_answer",
+        "inputs": {
+          "text": "{raw_response}"
+        },
+        "outputs": {
+          "answer": "answer",
+          "is_yes": "is_yes",
+          "confidence": "confidence"
+        }
+      },
+      {
+        "call": "lookup_expected",
+        "inputs": {
+          "dict": "{ground_truth}",
+          "key": "{item}"
+        },
+        "outputs": {
+          "value": "expected"
+        }
+      },
+      {
+        "call": "check_correct",
+        "inputs": {
+          "actual": "{is_yes}",
+          "expected": "{expected}"
+        },
+        "outputs": {
+          "match": "is_correct"
+        }
+      }
+    ],
+
+    "output_mappings": {
+      "is_correct": "{is_correct}",
+      "answer": "{answer}",
+      "is_yes": "{is_yes}",
+      "expected": "{expected}",
+      "confidence": "{confidence}",
+      "raw_response": "{raw_response}",
+      "final_prompt": "{final_prompt}"
+    }
+  }
+}

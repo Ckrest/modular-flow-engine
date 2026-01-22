@@ -1,0 +1,86 @@
+{
+  "name": "council_test",
+  "description": "Test the council composite with a simple classification task",
+
+  "components": {
+    "api_key": {
+      "type": "source/api_key",
+      "config": {
+        "key_name": "openrouter",
+        "required": true
+      }
+    },
+
+    "categories": {
+      "type": "source/literal",
+      "config": {
+        "value": ["animal", "plant", "mineral", "other"]
+      }
+    },
+
+    "system_prompt": {
+      "type": "source/literal",
+      "config": {
+        "value": "Classify the item as: animal, plant, mineral, or other. Reply with ONLY the category name, one word."
+      }
+    },
+
+    "items": {
+      "type": "source/literal",
+      "config": {
+        "value": ["dog", "diamond"]
+      }
+    },
+
+    "council": {
+      "type": "composite/council"
+    },
+
+    "results": {
+      "type": "sink/collector"
+    }
+  },
+
+  "flow": [
+    {"source": "api_key"},
+    {"source": "categories"},
+    {"source": "system_prompt"},
+    {"source": "items"},
+
+    {
+      "loop": {
+        "over": "items.value",
+        "as": "item",
+        "steps": [
+          {
+            "call": "council",
+            "inputs": {
+              "question": "Classify: {item}",
+              "categories": "{categories.value}",
+              "system_prompt": "{system_prompt.value}",
+              "api_key": "{api_key.key}"
+            },
+            "outputs": {
+              "answer": "classification",
+              "consensus_type": "consensus",
+              "vote_counts": "votes",
+              "model_votes": "breakdown"
+            }
+          },
+          {
+            "call": "results",
+            "inputs": {
+              "item": "{item}",
+              "classification": "{classification}",
+              "consensus": "{consensus}",
+              "votes": "{votes}",
+              "breakdown": "{breakdown}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "results"}
+  ]
+}

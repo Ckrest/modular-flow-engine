@@ -1,0 +1,69 @@
+{
+  "name": "with_inputs",
+  "description": "Reusable plan: user provides the data file and processing options",
+
+  "inputs": {
+    "data_file": {
+      "type": "path",
+      "required": true,
+      "description": "Path to file with items (one per line)"
+    },
+    "prefix": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Prefix to add to each item"
+    },
+    "suffix": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "description": "Suffix to add to each item"
+    }
+  },
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "{$inputs.data_file}"
+      }
+    },
+    "format": {
+      "type": "transform/template"
+    },
+    "results": {
+      "type": "sink/collector"
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "steps": [
+          {
+            "call": "format",
+            "inputs": {
+              "template": "{prefix}{item}{suffix}",
+              "prefix": "{prefix}",
+              "item": "{item}",
+              "suffix": "{suffix}"
+            },
+            "outputs": {"result": "formatted"}
+          },
+          {
+            "call": "results",
+            "inputs": {
+              "original": "{item}",
+              "formatted": "{formatted}"
+            }
+          }
+        ]
+      }
+    },
+    {"sink": "results"}
+  ]
+}

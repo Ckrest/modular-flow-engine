@@ -1,0 +1,179 @@
+{
+  "name": "council",
+  "type": "composite",
+  "description": "Multi-model council that votes on a question and checks for consensus",
+
+  "inputs": {
+    "question": {
+      "type": "string",
+      "required": true,
+      "description": "The question or item to evaluate"
+    },
+    "categories": {
+      "type": "list",
+      "required": true,
+      "description": "List of valid response categories"
+    },
+    "system_prompt": {
+      "type": "string",
+      "required": true,
+      "description": "System prompt explaining how to categorize"
+    },
+    "api_key": {
+      "type": "string",
+      "required": true,
+      "description": "OpenRouter API key"
+    }
+  },
+
+  "outputs": {
+    "answer": {
+      "type": "string",
+      "description": "The top category (majority winner or disputed leader)"
+    },
+    "consensus_type": {
+      "type": "string",
+      "description": "unanimous, majority, or disputed"
+    },
+    "vote_counts": {
+      "type": "dict",
+      "description": "Vote count per category"
+    },
+    "model_votes": {
+      "type": "dict",
+      "description": "Each model's vote: {model: category}"
+    },
+    "votes": {
+      "type": "list",
+      "description": "Raw vote data for further processing"
+    }
+  },
+
+  "config": {
+    "models": {
+      "type": "list",
+      "default": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4", "google/gemini-2.5-flash-preview-09-2025", "meta-llama/llama-4-maverick", "deepseek/deepseek-v3.2"],
+      "description": "List of models in the council"
+    },
+    "majority_threshold": {
+      "type": "float",
+      "default": 0.5,
+      "description": "Threshold for majority consensus"
+    },
+    "temperature": {
+      "type": "float",
+      "default": 0.0,
+      "description": "Model temperature"
+    },
+    "max_tokens": {
+      "type": "integer",
+      "default": 20,
+      "description": "Max tokens for responses"
+    }
+  },
+
+  "internal": {
+    "components": {
+      "model_list": {
+        "type": "source/literal",
+        "config": {
+          "value": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4", "google/gemini-2.5-flash-preview-09-2025", "meta-llama/llama-4-maverick", "deepseek/deepseek-v3.2"]
+        }
+      },
+
+      "ask_model": {
+        "type": "transform/openrouter",
+        "config": {
+          "temperature": 0.0,
+          "max_tokens": 20,
+          "timeout": 30
+        }
+      },
+
+      "parse_response": {
+        "type": "transform/category_parser",
+        "config": {
+          "default_category": "unknown"
+        }
+      },
+
+      "votes": {
+        "type": "sink/collector"
+      },
+
+      "consensus": {
+        "type": "transform/category_consensus",
+        "config": {
+          "item_field": "item",
+          "category_field": "category",
+          "model_field": "model",
+          "majority_threshold": 0.5
+        }
+      }
+    },
+
+    "flow": [
+      {"source": "model_list"},
+
+      {
+        "loop": {
+          "over": "model_list.value",
+          "as": "model_name",
+          "steps": [
+            {
+              "call": "ask_model",
+              "inputs": {
+                "prompt": "{question}",
+                "system_prompt": "{system_prompt}",
+                "api_key": "{api_key}",
+                "model": "{model_name}"
+              },
+              "outputs": {
+                "response": "raw_response"
+              }
+            },
+            {
+              "call": "parse_response",
+              "inputs": {
+                "text": "{raw_response}",
+                "categories": "{categories}"
+              },
+              "outputs": {
+                "category": "parsed_category"
+              }
+            },
+            {
+              "call": "votes",
+              "inputs": {
+                "item": "{question}",
+                "model": "{model_name}",
+                "category": "{parsed_category}",
+                "raw_response": "{raw_response}"
+              }
+            }
+          ]
+        }
+      },
+
+      {"sink": "votes"},
+
+      {
+        "call": "consensus",
+        "inputs": {
+          "votes": "{votes.items}"
+        },
+        "outputs": {
+          "results": "consensus_results"
+        }
+      }
+    ],
+
+    "output_mappings": {
+      "answer": "{consensus_results[0].top_category}",
+      "consensus_type": "{consensus_results[0].consensus_type}",
+      "vote_counts": "{consensus_results[0].vote_counts}",
+      "model_votes": "{consensus_results[0].model_votes}",
+      "votes": "{votes.items}"
+    }
+  }
+}

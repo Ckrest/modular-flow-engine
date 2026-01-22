@@ -1,0 +1,6 @@
+# Core dependencies
+httpx>=0.24.0
+
+# Optional for development
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

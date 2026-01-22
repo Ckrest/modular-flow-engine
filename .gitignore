@@ -1,0 +1,39 @@
+# API keys and secrets
+config/api_keys.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Results and outputs
+results/
+
+# Checkpoint state (per run)
+runs/
+
+# User-specific plans and data (not distributable)
+# Keep plans/examples/ tracked (distributable)
+plans/local/
+plans/samples/
+plans/*.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Systems-specific files (tracked by vcsh systems, not this repo)
+manifest.yaml
+NOTES.md
+CLAUDE.md

@@ -1,0 +1,88 @@
+{
+  "name": "transform_chain",
+  "description": "Chain multiple transforms: load items, look up metadata, format output",
+
+  "inputs": {
+    "items_file": {
+      "type": "path",
+      "required": true,
+      "description": "File with items to process"
+    },
+    "metadata_file": {
+      "type": "path",
+      "required": true,
+      "description": "File with key|value metadata"
+    }
+  },
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "{$inputs.items_file}"
+      }
+    },
+    "metadata": {
+      "type": "source/key_value",
+      "config": {
+        "path": "{$inputs.metadata_file}",
+        "delimiter": "|"
+      }
+    },
+    "lookup": {
+      "type": "transform/lookup",
+      "config": {
+        "default": "(no metadata)"
+      }
+    },
+    "format": {
+      "type": "transform/template"
+    },
+    "results": {
+      "type": "sink/collector"
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+    {"source": "metadata"},
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "steps": [
+          {
+            "call": "lookup",
+            "inputs": {
+              "dict": "{metadata.data}",
+              "key": "{item}"
+            },
+            "outputs": {
+              "value": "meta_value",
+              "found": "has_metadata"
+            }
+          },
+          {
+            "call": "format",
+            "inputs": {
+              "template": "{item} -> {meta_value}",
+              "item": "{item}",
+              "meta_value": "{meta_value}"
+            },
+            "outputs": {"result": "summary"}
+          },
+          {
+            "call": "results",
+            "inputs": {
+              "item": "{item}",
+              "metadata": "{meta_value}",
+              "has_metadata": "{has_metadata}",
+              "summary": "{summary}"
+            }
+          }
+        ]
+      }
+    },
+    {"sink": "results"}
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "name": "ask_category",
+  "type": "composite",
+  "description": "Ask a model to classify an item into a category",
+
+  "inputs": {
+    "prompt_template": {
+      "type": "string",
+      "required": true,
+      "description": "Prompt template with {item} placeholder"
+    },
+    "item": {
+      "type": "string",
+      "required": true,
+      "description": "Item to classify"
+    },
+    "categories": {
+      "type": "list",
+      "required": true,
+      "description": "List of valid category names"
+    },
+    "system_prompt": {
+      "type": "string",
+      "required": false,
+      "description": "Optional system prompt"
+    }
+  },
+
+  "outputs": {
+    "category": {
+      "type": "string",
+      "description": "The classified category"
+    },
+    "matched": {
+      "type": "boolean",
+      "description": "Whether a valid category was parsed"
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Parse confidence: exact, partial, none"
+    },
+    "raw_response": {
+      "type": "string",
+      "description": "Raw model response"
+    },
+    "model": {
+      "type": "string",
+      "description": "Model that was used"
+    }
+  },
+
+  "config": {
+    "model": {
+      "type": "string",
+      "default": "qwen2.5:0.5b",
+      "description": "Ollama model to use"
+    },
+    "default_category": {
+      "type": "string",
+      "default": "unknown",
+      "description": "Category if parsing fails"
+    }
+  },
+
+  "internal": {
+    "components": {
+      "build_prompt": {
+        "type": "transform/template",
+        "config": {}
+      },
+      "ask_model": {
+        "type": "transform/model_manager",
+        "config": {
+          "model": "qwen2.5:0.5b"
+        }
+      },
+      "parse_category": {
+        "type": "transform/category_parser",
+        "config": {
+          "default_category": "unknown"
+        }
+      }
+    },
+
+    "flow": [
+      {
+        "call": "build_prompt",
+        "inputs": {
+          "template": "{prompt_template}",
+          "item": "{item}"
+        },
+        "outputs": {
+          "result": "final_prompt"
+        }
+      },
+      {
+        "call": "ask_model",
+        "inputs": {
+          "prompt": "{final_prompt}",
+          "system_prompt": "{system_prompt}"
+        },
+        "outputs": {
+          "response": "raw_response",
+          "model": "model_used"
+        }
+      },
+      {
+        "call": "parse_category",
+        "inputs": {
+          "text": "{raw_response}",
+          "categories": "{categories}"
+        },
+        "outputs": {
+          "category": "category",
+          "matched": "matched",
+          "confidence": "confidence"
+        }
+      }
+    ],
+
+    "output_mappings": {
+      "category": "{category}",
+      "matched": "{matched}",
+      "confidence": "{confidence}",
+      "raw_response": "{raw_response}",
+      "model": "{model_used}"
+    }
+  }
+}

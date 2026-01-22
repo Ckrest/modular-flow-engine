@@ -1,0 +1,88 @@
+{
+  "name": "two_phase",
+  "description": "Two-phase collection: gather data in phase 1, then use collected results in phase 2",
+
+  "inputs": {
+    "data_file": {
+      "type": "path",
+      "required": true,
+      "description": "File with items to process"
+    }
+  },
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "{$inputs.data_file}"
+      }
+    },
+    "format": {
+      "type": "transform/template"
+    },
+    "phase1_collector": {
+      "type": "sink/collector"
+    },
+    "final_results": {
+      "type": "sink/collector"
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "index": "i",
+        "steps": [
+          {
+            "call": "format",
+            "inputs": {
+              "template": "processed_{item}",
+              "item": "{item}"
+            },
+            "outputs": {"result": "processed"}
+          },
+          {
+            "call": "phase1_collector",
+            "inputs": {
+              "index": "{i}",
+              "original": "{item}",
+              "value": "{processed}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "phase1_collector"},
+
+    {
+      "loop": {
+        "over": "phase1_collector.items",
+        "as": "collected",
+        "steps": [
+          {
+            "call": "format",
+            "inputs": {
+              "template": "FINAL: {value} (was {original})",
+              "value": "{collected.value}",
+              "original": "{collected.original}"
+            },
+            "outputs": {"result": "final_value"}
+          },
+          {
+            "call": "final_results",
+            "inputs": {
+              "summary": "{final_value}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "final_results"}
+  ]
+}

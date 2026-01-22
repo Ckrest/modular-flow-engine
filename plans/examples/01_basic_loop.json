@@ -1,0 +1,37 @@
+{
+  "name": "basic_loop",
+  "description": "Simplest pattern: load items, loop over them, collect results",
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "plans/examples/sample_items.txt"
+      }
+    },
+    "results": {
+      "type": "sink/collector"
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "index": "i",
+        "steps": [
+          {
+            "call": "results",
+            "inputs": {
+              "index": "{i}",
+              "value": "{item}"
+            }
+          }
+        ]
+      }
+    },
+    {"sink": "results"}
+  ]
+}

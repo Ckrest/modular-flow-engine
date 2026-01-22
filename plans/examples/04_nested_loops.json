@@ -1,0 +1,77 @@
+{
+  "name": "nested_loops",
+  "description": "Cross-product iteration: combine every item with every option",
+
+  "inputs": {
+    "items_file": {
+      "type": "path",
+      "required": true,
+      "description": "File with items"
+    },
+    "options": {
+      "type": "list",
+      "required": true,
+      "description": "List of options to combine with each item"
+    }
+  },
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "{$inputs.items_file}"
+      }
+    },
+    "option_list": {
+      "type": "source/literal",
+      "config": {
+        "value": "{$inputs.options}"
+      }
+    },
+    "format": {
+      "type": "transform/template"
+    },
+    "results": {
+      "type": "sink/collector"
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+    {"source": "option_list"},
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "steps": [
+          {
+            "loop": {
+              "over": "option_list.value",
+              "as": "option",
+              "steps": [
+                {
+                  "call": "format",
+                  "inputs": {
+                    "template": "{item}:{option}",
+                    "item": "{item}",
+                    "option": "{option}"
+                  },
+                  "outputs": {"result": "combined"}
+                },
+                {
+                  "call": "results",
+                  "inputs": {
+                    "item": "{item}",
+                    "option": "{option}",
+                    "combined": "{combined}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {"sink": "results"}
+  ]
+}
