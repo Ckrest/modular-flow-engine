@@ -1,0 +1,27 @@
+{
+  "name": "test_multi_sink",
+  "description": "Test multiple sinks with different destinations",
+  "components": {
+    "data": {
+      "type": "source/literal",
+      "config": {"value": ["x", "y", "z"]}
+    },
+    "memory_sink": {
+      "type": "sink/collector",
+      "config": {"destinations": ["return"]}
+    },
+    "file_sink": {
+      "type": "sink/json_writer",
+      "config": {"path": "file_output.json", "destinations": ["file"]}
+    }
+  },
+  "flow": [
+    {"source": "data"},
+    {"loop": {"over": "data.value", "as": "v", "steps": [
+      {"call": "memory_sink", "inputs": {"val": "{v}"}},
+      {"call": "file_sink", "inputs": {"val": "{v}"}}
+    ]}},
+    {"sink": "memory_sink"},
+    {"sink": "file_sink"}
+  ]
+}

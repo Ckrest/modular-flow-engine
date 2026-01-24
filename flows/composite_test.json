@@ -1,0 +1,85 @@
+{
+  "name": "composite_test",
+  "description": "Test composite component execution",
+
+  "components": {
+    "characters": {
+      "type": "source/text_list",
+      "config": {
+        "path": "flows/samples/character_list.txt"
+      }
+    },
+
+    "ground_truth": {
+      "type": "source/key_value",
+      "config": {
+        "path": "flows/samples/character_ground_truth.txt",
+        "delimiter": "|",
+        "value_type": "boolean"
+      }
+    },
+
+    "system_prompt": {
+      "type": "source/literal",
+      "config": {
+        "value": "Answer only yes or no."
+      }
+    },
+
+    "evaluator": {
+      "type": "composite/evaluate_yesno",
+      "config": {
+        "model": "meta-llama/llama-3.3-70b-instruct",
+        "temperature": 0.0
+      }
+    },
+
+    "results": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["character", "is_correct", "answer", "expected"]
+      }
+    }
+  },
+
+  "flow": [
+    {"source": "characters"},
+    {"source": "ground_truth"},
+    {"source": "system_prompt"},
+
+    {
+      "loop": {
+        "over": "characters.items",
+        "as": "character",
+        "steps": [
+          {
+            "call": "evaluator",
+            "inputs": {
+              "question_template": "Does {item} have blonde hair?",
+              "item": "{character}",
+              "ground_truth": "{ground_truth.data}",
+              "system_prompt": "{system_prompt.value}"
+            },
+            "outputs": {
+              "is_correct": "eval_correct",
+              "answer": "eval_answer",
+              "expected": "eval_expected"
+            }
+          },
+
+          {
+            "call": "results",
+            "inputs": {
+              "character": "{character}",
+              "is_correct": "{eval_correct}",
+              "answer": "{eval_answer}",
+              "expected": "{eval_expected}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "results"}
+  ]
+}

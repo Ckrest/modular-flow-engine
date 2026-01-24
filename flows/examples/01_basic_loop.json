@@ -6,7 +6,7 @@
     "items": {
       "type": "source/text_list",
       "config": {
-        "path": "plans/examples/sample_items.txt"
+        "path": "flows/examples/sample_items.txt"
       }
     },
     "results": {

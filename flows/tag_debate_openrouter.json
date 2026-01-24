@@ -1,0 +1,323 @@
+{
+  "name": "tag_debate_openrouter",
+  "description": "Multi-model debate for tag classification using premium OpenRouter models (7 voters + expert arbitrator)",
+
+  "settings": {
+    "output_mode": "normal"
+  },
+
+  "components": {
+    "api_key": {
+      "type": "source/api_key",
+      "config": {
+        "key_name": "openrouter",
+        "required": true
+      }
+    },
+
+    "tags": {
+      "type": "source/literal",
+      "config": {
+        "value": [
+          "1girl",
+          "smile",
+          "sitting",
+          "outdoors",
+          "weapon",
+          "blue_eyes",
+          "long_hair",
+          "school_uniform",
+          "sunset",
+          "running"
+        ]
+      }
+    },
+
+    "categories": {
+      "type": "source/literal",
+      "config": {
+        "value": ["appearance", "action", "setting", "object", "composition"]
+      }
+    },
+
+    "models": {
+      "type": "source/literal",
+      "config": {
+        "value": [
+          "openai/gpt-4.1-mini",
+          "anthropic/claude-sonnet-4",
+          "google/gemini-2.5-flash-preview-09-2025",
+          "meta-llama/llama-4-maverick",
+          "deepseek/deepseek-v3.2",
+          "qwen/qwen-plus-2025-07-28",
+          "mistralai/ministral-14b-2512"
+        ]
+      }
+    },
+
+    "system_instruction": {
+      "type": "source/literal",
+      "config": {
+        "value": "You are a tag classifier for anime/illustration tags. Classify the given tag into exactly ONE category based on what the tag primarily describes. Answer with just the category name, nothing else.\n\nCategories:\n- appearance: Physical attributes (hair, eyes, body features, clothing items worn)\n- action: Things a character is doing (verbs, poses, activities)\n- setting: Environment, location, time of day, weather\n- object: Items, props, things that aren't worn\n- composition: Camera angle, framing, artistic style"
+      }
+    },
+
+    "arbitrator_instruction": {
+      "type": "source/literal",
+      "config": {
+        "value": "You are an expert arbiter resolving a classification dispute. Multiple AI models disagreed on how to classify an anime/illustration tag. Review their votes carefully, consider the nuances, and pick the BEST category. Answer with just the category name, nothing else."
+      }
+    },
+
+    "build_prompt": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "ask_model": {
+      "type": "transform/openrouter",
+      "config": {
+        "temperature": 0.1,
+        "max_tokens": 20,
+        "timeout": 60
+      }
+    },
+
+    "parse_category": {
+      "type": "transform/category_parser",
+      "config": {
+        "default_category": "unknown"
+      }
+    },
+
+    "votes_collector": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["tag", "model", "category", "matched", "raw_response"]
+      }
+    },
+
+    "check_consensus": {
+      "type": "transform/category_consensus",
+      "config": {
+        "item_field": "tag",
+        "category_field": "category",
+        "model_field": "model",
+        "majority_threshold": 0.5
+      }
+    },
+
+    "build_debate_prompt": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "arbitrator": {
+      "type": "transform/openrouter",
+      "config": {
+        "model": "openai/gpt-4.1",
+        "temperature": 0.0,
+        "max_tokens": 20,
+        "timeout": 90
+      }
+    },
+
+    "parse_arbitration": {
+      "type": "transform/category_parser",
+      "config": {
+        "default_category": "unknown"
+      }
+    },
+
+    "final_collector": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["tag", "final_category", "consensus_type", "vote_counts"]
+      }
+    },
+
+    "report": {
+      "type": "sink/json_writer",
+      "config": {
+        "path": "tag_debate_openrouter_results.json"
+      }
+    }
+  },
+
+  "flow": [
+    {"source": "api_key"},
+    {"source": "tags"},
+    {"source": "categories"},
+    {"source": "models"},
+    {"source": "system_instruction"},
+    {"source": "arbitrator_instruction"},
+
+    {
+      "loop": {
+        "over": "tags.value",
+        "as": "tag",
+        "steps": [
+          {
+            "loop": {
+              "over": "models.value",
+              "as": "model_name",
+              "steps": [
+                {
+                  "call": "build_prompt",
+                  "inputs": {
+                    "template": "Classify this image tag into one of these categories: appearance, action, setting, object, composition.\n\nTag: {tag}\n\nCategory:",
+                    "tag": "{tag}"
+                  },
+                  "outputs": {
+                    "result": "classification_prompt"
+                  }
+                },
+
+                {
+                  "call": "ask_model",
+                  "inputs": {
+                    "prompt": "{classification_prompt}",
+                    "system_prompt": "{system_instruction.value}",
+                    "api_key": "{api_key.key}",
+                    "model": "{model_name}"
+                  },
+                  "outputs": {
+                    "response": "model_response"
+                  }
+                },
+
+                {
+                  "call": "parse_category",
+                  "inputs": {
+                    "text": "{model_response}",
+                    "categories": "{categories.value}"
+                  },
+                  "outputs": {
+                    "category": "voted_category",
+                    "matched": "vote_matched"
+                  }
+                },
+
+                {
+                  "call": "votes_collector",
+                  "inputs": {
+                    "tag": "{tag}",
+                    "model": "{model_name}",
+                    "category": "{voted_category}",
+                    "matched": "{vote_matched}",
+                    "raw_response": "{model_response}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "votes_collector"},
+
+    {
+      "call": "check_consensus",
+      "inputs": {
+        "votes": "{votes_collector.items}"
+      },
+      "outputs": {
+        "results": "consensus_results",
+        "agreed": "agreed_items",
+        "disputed": "disputed_items",
+        "summary": "consensus_summary"
+      }
+    },
+
+    {
+      "loop": {
+        "over": "agreed_items",
+        "as": "agreed",
+        "steps": [
+          {
+            "call": "final_collector",
+            "inputs": {
+              "tag": "{agreed.item}",
+              "final_category": "{agreed.final_category}",
+              "consensus_type": "{agreed.consensus_type}",
+              "vote_counts": "{agreed.vote_counts}"
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "loop": {
+        "over": "disputed_items",
+        "as": "dispute",
+        "steps": [
+          {
+            "call": "build_debate_prompt",
+            "inputs": {
+              "template": "Tag to classify: {tag}\n\nModel votes:\n{votes}\n\nCategories: appearance, action, setting, object, composition\n\nWhich category is correct?",
+              "tag": "{dispute.item}",
+              "votes": "{dispute.model_votes}"
+            },
+            "outputs": {
+              "result": "debate_prompt"
+            }
+          },
+
+          {
+            "call": "arbitrator",
+            "inputs": {
+              "prompt": "{debate_prompt}",
+              "system_prompt": "{arbitrator_instruction.value}",
+              "api_key": "{api_key.key}"
+            },
+            "outputs": {
+              "response": "arbitrator_response"
+            }
+          },
+
+          {
+            "call": "parse_arbitration",
+            "inputs": {
+              "text": "{arbitrator_response}",
+              "categories": "{categories.value}"
+            },
+            "outputs": {
+              "category": "arbitrated_category"
+            }
+          },
+
+          {
+            "call": "final_collector",
+            "inputs": {
+              "tag": "{dispute.item}",
+              "final_category": "{arbitrated_category}",
+              "consensus_type": "arbitrated",
+              "vote_counts": "{dispute.vote_counts}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "final_collector"},
+
+    {
+      "call": "report",
+      "inputs": {
+        "data": {
+          "votes": "{votes_collector.items}",
+          "total_votes": "{votes_collector.count}",
+          "consensus_summary": "{consensus_summary}",
+          "final_results": "{final_collector.items}"
+        }
+      }
+    }
+  ],
+
+  "error_handling": {
+    "default": "retry",
+    "max_retries": 3
+  }
+}

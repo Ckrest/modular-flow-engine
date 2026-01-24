@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 from enum import Enum
+from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -33,11 +35,10 @@ class ExecutionContext:
         engine: "DataflowEngine | None" = None,
         parent: "ExecutionContext | None" = None,
         variables: dict[str, Any] | None = None,
-        output_dir: "Path | None" = None,
+        output_dir: Path | None = None,
         output_mode: OutputMode | None = None,
         settings: dict[str, Any] | None = None
     ):
-        from pathlib import Path
         self._engine = engine
         self._parent = parent
         self._variables: dict[str, Any] = variables or {}
@@ -48,6 +49,7 @@ class ExecutionContext:
         self._finalized_sinks: set[str] = set()
         self._warned_sinks: set[str] = set()  # Avoid repeated warnings
         self._sink_ids: set[str] = set()  # Track which components are sinks
+        self._returns: dict[str, Any] = {}  # Return destination accumulator
 
     @property
     def engine(self) -> "DataflowEngine | None":
@@ -342,3 +344,65 @@ class ExecutionContext:
             for out, val in outputs.items()
         })
         return result
+
+    # === Destination Writers ===
+
+    def write(self, data: dict[str, Any], to: str, **kwargs) -> None:
+        """
+        Write data to a destination.
+
+        Args:
+            data: Data to write (must be JSON-serializable dict)
+            to: Destination - "return", "file", or "console"
+            **kwargs: Destination-specific options:
+                - path: Required for "file" destination
+
+        The "return" destination accumulates data in the context's return space,
+        which is collected by the engine and returned in ExecutionResult.returns.
+        """
+        if to == "return":
+            # Write to return space (propagate to root context)
+            self._write_return(data)
+        elif to == "file":
+            path = kwargs.get("path")
+            if not path:
+                raise ValueError("File destination requires 'path' argument")
+            self._write_file(data, path)
+        elif to == "console":
+            self._write_console(data)
+        else:
+            raise ValueError(f"Unknown destination: {to!r}")
+
+    def _write_return(self, data: dict[str, Any]) -> None:
+        """Write data to the return accumulator (propagates to root)."""
+        # Propagate to root context so returns are globally accessible
+        if self._parent is not None:
+            self._parent._write_return(data)
+        else:
+            self._returns.update(data)
+
+    def _write_file(self, data: dict[str, Any], path: str) -> None:
+        """Write data to a JSON file."""
+        full_path = Path(path)
+
+        # Resolve relative paths against output_dir
+        if self.output_dir and not full_path.is_absolute():
+            full_path = self.output_dir / full_path
+
+        # Ensure parent directory exists
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(full_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+
+    def _write_console(self, data: dict[str, Any]) -> None:
+        """Write data to console (respects output_mode)."""
+        if self.output_mode in (OutputMode.NORMAL, OutputMode.DEBUG):
+            print(json.dumps(data, indent=2, ensure_ascii=False, default=str))
+
+    def get_returns(self) -> dict[str, Any]:
+        """Get accumulated return data from all sinks."""
+        # Walk to root context to get all returns
+        if self._parent is not None:
+            return self._parent.get_returns()
+        return dict(self._returns)

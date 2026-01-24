@@ -1,0 +1,32 @@
+{
+  "name": "destination_test",
+  "description": "Test flow for unified output destinations",
+  "components": {
+    "items": {
+      "type": "source/literal",
+      "config": {
+        "value": ["apple", "banana", "cherry"]
+      }
+    },
+    "results": {
+      "type": "sink/collector",
+      "config": {
+        "destinations": ["return", "file"],
+        "path": "collected_items.json"
+      }
+    }
+  },
+  "flow": [
+    {"source": "items"},
+    {
+      "loop": {
+        "over": "items.value",
+        "as": "item",
+        "steps": [
+          {"call": "results", "inputs": {"fruit": "{item}"}}
+        ]
+      }
+    },
+    {"sink": "results"}
+  ]
+}

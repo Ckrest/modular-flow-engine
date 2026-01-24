@@ -1,0 +1,23 @@
+{
+  "name": "test_console",
+  "description": "Test console destination",
+  "components": {
+    "data": {
+      "type": "source/literal",
+      "config": {"value": ["hello", "world"]}
+    },
+    "collector": {
+      "type": "sink/collector",
+      "config": {
+        "destinations": ["console", "return"]
+      }
+    }
+  },
+  "flow": [
+    {"source": "data"},
+    {"loop": {"over": "data.value", "as": "word", "steps": [
+      {"call": "collector", "inputs": {"text": "{word}"}}
+    ]}},
+    {"sink": "collector"}
+  ]
+}

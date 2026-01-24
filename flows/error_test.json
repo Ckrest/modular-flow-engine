@@ -1,0 +1,80 @@
+{
+  "name": "error_test",
+  "description": "Test error handling and tracing",
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "flows/samples/character_list.txt"
+      }
+    },
+
+    "template": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "lookup": {
+      "type": "transform/lookup",
+      "config": {
+        "default": null
+      }
+    },
+
+    "results": {
+      "type": "sink/collector",
+      "config": {}
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "index": "idx",
+        "steps": [
+          {
+            "call": "template",
+            "inputs": {
+              "template": "Processing: {item}",
+              "item": "{item}"
+            },
+            "outputs": {
+              "result": "formatted"
+            }
+          },
+
+          {
+            "call": "lookup",
+            "inputs": {
+              "dict": "{nonexistent_variable}",
+              "key": "{item}"
+            },
+            "outputs": {
+              "value": "looked_up"
+            }
+          },
+
+          {
+            "call": "results",
+            "inputs": {
+              "item": "{item}",
+              "formatted": "{formatted}",
+              "value": "{looked_up}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "results"}
+  ],
+
+  "error_handling": {
+    "default": "skip"
+  }
+}

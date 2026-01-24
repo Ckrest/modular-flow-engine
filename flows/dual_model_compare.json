@@ -1,0 +1,54 @@
+{
+  "name": "dual_model_compare",
+  "description": "Ask the same question to both a local Ollama model and OpenRouter, compare responses",
+  "components": {
+    "api_key": {
+      "type": "source/api_key",
+      "config": {"key_name": "openrouter"}
+    },
+    "question": {
+      "type": "source/literal",
+      "config": {"value": "In one sentence, what is the most important thing about software testing?"}
+    },
+    "local_model": {
+      "type": "transform/model_manager",
+      "config": {
+        "model": "qwen2.5:0.5b",
+        "timeout": 60
+      }
+    },
+    "cloud_model": {
+      "type": "transform/openrouter",
+      "config": {
+        "model": "google/gemini-2.0-flash-001",
+        "max_tokens": 200
+      }
+    },
+    "results": {
+      "type": "sink/collector",
+      "config": {
+        "destinations": ["return"]
+      }
+    }
+  },
+  "flow": [
+    {"source": "api_key"},
+    {"source": "question"},
+    {"call": "local_model", "inputs": {"prompt": "{question.value}"}},
+    {"call": "results", "inputs": {
+      "source": "local",
+      "model": "{local_model.model}",
+      "response": "{local_model.response}"
+    }},
+    {"call": "cloud_model", "inputs": {
+      "prompt": "{question.value}",
+      "api_key": "{api_key.key}"
+    }},
+    {"call": "results", "inputs": {
+      "source": "cloud",
+      "model": "{cloud_model.model}",
+      "response": "{cloud_model.response}"
+    }},
+    {"sink": "results"}
+  ]
+}

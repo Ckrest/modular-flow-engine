@@ -34,9 +34,10 @@ class PlanInputSpec:
 
 @dataclass
 class ExecutionResult:
-    """Result of executing a plan."""
+    """Result of executing a flow."""
     success: bool
     outputs: dict[str, Any] = field(default_factory=dict)
+    returns: dict[str, Any] = field(default_factory=dict)  # Resolved flow returns
     errors: list[ErrorRecord] = field(default_factory=list)
     duration_seconds: float = 0.0
     stats: dict[str, Any] = field(default_factory=dict)
@@ -72,7 +73,7 @@ class DataflowEngine:
 
     def load_plan(self, plan: dict[str, Any] | str | Path) -> None:
         """
-        Load a plan from dict, JSON string, or file path.
+        Load a plan/flow from dict, JSON string, or file path.
         """
         if isinstance(plan, (str, Path)):
             path = Path(plan)
@@ -93,6 +94,10 @@ class DataflowEngine:
                 max_retries=eh.get("max_retries", 3),
                 default_value=eh.get("default_value"),
             )
+
+    def load_flow(self, flow: dict[str, Any] | str | Path) -> None:
+        """Alias for load_plan - loads a flow definition."""
+        self.load_plan(flow)
 
     def get_input_schema(self) -> dict[str, PlanInputSpec]:
         """Get the plan's declared inputs with their specifications."""
@@ -297,12 +302,13 @@ class DataflowEngine:
             flow = self.plan.get("flow", [])
             await self._execute_steps(flow, self.context, errors)
 
-            # Collect outputs
-            outputs = self._collect_outputs()
+            # Get returns from context (accumulated by sinks via context.write())
+            returns = self.context.get_returns()
 
             return ExecutionResult(
                 success=len([e for e in errors if not e.recovered]) == 0,
-                outputs=outputs,
+                outputs={},  # Deprecated - use returns instead
+                returns=returns,
                 errors=errors,
                 duration_seconds=time.time() - start_time,
                 stats=dict(self._stats),
@@ -596,17 +602,3 @@ class DataflowEngine:
         if isinstance(value, str):
             return value.lower() not in ("false", "no", "0", "")
         return bool(value)
-
-    def _collect_outputs(self) -> dict[str, Any]:
-        """Collect final outputs from sink components."""
-        outputs = {}
-
-        # Find all sink components and get their collected data
-        for comp_id, component in self.components.items():
-            manifest = component.describe()
-            if manifest.category == "sink":
-                comp_outputs = self.context.get_component_output(comp_id)
-                if comp_outputs:
-                    outputs[comp_id] = comp_outputs
-
-        return outputs

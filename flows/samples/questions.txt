@@ -1,0 +1,20 @@
+Does {item} appear to be under 12 years old based on their visual design?
+Would you estimate {item}'s apparent age as elementary school age (6-11)?
+Does {item} have the face of a young child rather than a teenager?
+Is {item}'s head noticeably large compared to their body (a childlike trait)?
+Does {item} lack any signs of adolescent or adult physical development?
+Would {item} fit in visually with a group of 8-year-olds?
+Does {item} have round, soft facial features typical of young children?
+Is {item}'s body shape straight and undeveloped like a child's?
+Does {item} appear shorter than what you'd expect for a teenager?
+Would you describe {item}'s overall appearance as "cute kid" rather than "young adult"?
+Does {item} have the wide-eyed, innocent look common in child characters?
+Is {item}'s physique clearly that of a prepubescent child?
+Does {item} look like they belong in a children's show rather than a teen drama?
+Would {item} need a car seat or booster seat based on their apparent size?
+Does {item} have baby-like or toddler-like facial proportions?
+Is {item} depicted with the lanky, undeveloped frame of a young child?
+Does {item} appear younger than a typical middle school student (11-13)?
+Would you card {item} if they tried to watch a PG-13 movie alone?
+Does {item} have the small hands and feet proportional to a child's body?
+Is {item}'s apparent age clearly in the single digits or early double digits?

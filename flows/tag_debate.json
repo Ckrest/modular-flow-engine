@@ -1,0 +1,303 @@
+{
+  "name": "tag_debate",
+  "description": "Multi-model debate for tag classification with consensus voting and arbitration",
+
+  "settings": {
+    "output_mode": "normal"
+  },
+
+  "components": {
+    "tags": {
+      "type": "source/literal",
+      "config": {
+        "value": [
+          "1girl",
+          "smile",
+          "sitting",
+          "outdoors",
+          "weapon",
+          "blue_eyes",
+          "long_hair",
+          "school_uniform",
+          "sunset",
+          "running"
+        ]
+      }
+    },
+
+    "categories": {
+      "type": "source/literal",
+      "config": {
+        "value": ["appearance", "action", "setting", "object", "composition"]
+      }
+    },
+
+    "models": {
+      "type": "source/literal",
+      "config": {
+        "value": [
+          "qwen2.5:0.5b",
+          "tinyllama:latest",
+          "llama3.2:3b"
+        ]
+      }
+    },
+
+    "system_instruction": {
+      "type": "source/literal",
+      "config": {
+        "value": "You are a tag classifier. Classify the given tag into exactly ONE category. Answer with just the category name, nothing else."
+      }
+    },
+
+    "arbitrator_instruction": {
+      "type": "source/literal",
+      "config": {
+        "value": "You are an expert arbiter resolving a classification dispute. Multiple models disagreed on how to classify a tag. Review the votes and pick the BEST category. Answer with just the category name, nothing else."
+      }
+    },
+
+    "build_prompt": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "ask_model": {
+      "type": "transform/model_manager",
+      "config": {
+        "timeout": 60
+      }
+    },
+
+    "parse_category": {
+      "type": "transform/category_parser",
+      "config": {
+        "default_category": "unknown"
+      }
+    },
+
+    "votes_collector": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["tag", "model", "category", "matched", "raw_response"]
+      }
+    },
+
+    "check_consensus": {
+      "type": "transform/category_consensus",
+      "config": {
+        "item_field": "tag",
+        "category_field": "category",
+        "model_field": "model",
+        "majority_threshold": 0.5
+      }
+    },
+
+    "build_debate_prompt": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "arbitrator": {
+      "type": "transform/model_manager",
+      "config": {
+        "model": "gemma3:latest",
+        "timeout": 90
+      }
+    },
+
+    "parse_arbitration": {
+      "type": "transform/category_parser",
+      "config": {
+        "default_category": "unknown"
+      }
+    },
+
+    "final_collector": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["tag", "final_category", "consensus_type", "vote_counts"]
+      }
+    },
+
+    "report": {
+      "type": "sink/json_writer",
+      "config": {
+        "path": "tag_debate_results.json"
+      }
+    }
+  },
+
+  "flow": [
+    {"source": "tags"},
+    {"source": "categories"},
+    {"source": "models"},
+    {"source": "system_instruction"},
+    {"source": "arbitrator_instruction"},
+
+    {
+      "loop": {
+        "over": "tags.value",
+        "as": "tag",
+        "steps": [
+          {
+            "loop": {
+              "over": "models.value",
+              "as": "model_name",
+              "steps": [
+                {
+                  "call": "build_prompt",
+                  "inputs": {
+                    "template": "Classify this image tag into one of these categories: appearance, action, setting, object, composition.\n\nTag: {tag}\n\nCategory:",
+                    "tag": "{tag}"
+                  },
+                  "outputs": {
+                    "result": "classification_prompt"
+                  }
+                },
+
+                {
+                  "call": "ask_model",
+                  "inputs": {
+                    "prompt": "{classification_prompt}",
+                    "system_prompt": "{system_instruction.value}",
+                    "model": "{model_name}"
+                  },
+                  "outputs": {
+                    "response": "model_response"
+                  }
+                },
+
+                {
+                  "call": "parse_category",
+                  "inputs": {
+                    "text": "{model_response}",
+                    "categories": "{categories.value}"
+                  },
+                  "outputs": {
+                    "category": "voted_category",
+                    "matched": "vote_matched"
+                  }
+                },
+
+                {
+                  "call": "votes_collector",
+                  "inputs": {
+                    "tag": "{tag}",
+                    "model": "{model_name}",
+                    "category": "{voted_category}",
+                    "matched": "{vote_matched}",
+                    "raw_response": "{model_response}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "votes_collector"},
+
+    {
+      "call": "check_consensus",
+      "inputs": {
+        "votes": "{votes_collector.items}"
+      },
+      "outputs": {
+        "results": "consensus_results",
+        "agreed": "agreed_items",
+        "disputed": "disputed_items",
+        "summary": "consensus_summary"
+      }
+    },
+
+    {
+      "loop": {
+        "over": "agreed_items",
+        "as": "agreed",
+        "steps": [
+          {
+            "call": "final_collector",
+            "inputs": {
+              "tag": "{agreed.item}",
+              "final_category": "{agreed.final_category}",
+              "consensus_type": "{agreed.consensus_type}",
+              "vote_counts": "{agreed.vote_counts}"
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "loop": {
+        "over": "disputed_items",
+        "as": "dispute",
+        "steps": [
+          {
+            "call": "build_debate_prompt",
+            "inputs": {
+              "template": "Tag to classify: {tag}\n\nModel votes:\n{votes}\n\nCategories: appearance, action, setting, object, composition\n\nWhich category is correct?",
+              "tag": "{dispute.item}",
+              "votes": "{dispute.model_votes}"
+            },
+            "outputs": {
+              "result": "debate_prompt"
+            }
+          },
+
+          {
+            "call": "arbitrator",
+            "inputs": {
+              "prompt": "{debate_prompt}",
+              "system_prompt": "{arbitrator_instruction.value}"
+            },
+            "outputs": {
+              "response": "arbitrator_response"
+            }
+          },
+
+          {
+            "call": "parse_arbitration",
+            "inputs": {
+              "text": "{arbitrator_response}",
+              "categories": "{categories.value}"
+            },
+            "outputs": {
+              "category": "arbitrated_category"
+            }
+          },
+
+          {
+            "call": "final_collector",
+            "inputs": {
+              "tag": "{dispute.item}",
+              "final_category": "{arbitrated_category}",
+              "consensus_type": "arbitrated",
+              "vote_counts": "{dispute.vote_counts}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "final_collector"},
+
+    {
+      "call": "report",
+      "inputs": {
+        "data": {
+          "votes": "{votes_collector.items}",
+          "total_votes": "{votes_collector.count}",
+          "consensus_summary": "{consensus_summary}",
+          "final_results": "{final_collector.items}"
+        }
+      }
+    }
+  ],
+
+  "error_handling": {
+    "default": "skip"
+  }
+}

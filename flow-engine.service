@@ -1,0 +1,15 @@
+[Unit]
+Description=Modular Flow Engine HTTP Service
+After=network.target
+X-ProcessManager=true
+
+[Service]
+Type=simple
+WorkingDirectory=/home/nick/Systems/ai/modular-flow-engine
+ExecStart=/home/nick/Systems/ai/modular-flow-engine/server.py
+Restart=on-failure
+RestartSec=5
+Environment=FLOW_ENGINE_WORKERS=2
+
+[Install]
+WantedBy=default.target

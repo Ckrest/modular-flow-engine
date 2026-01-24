@@ -19,7 +19,6 @@ from .errors import (
 )
 from .engine import DataflowEngine, ExecutionResult, PlanInputSpec
 from .tracing import ExecutionTracer, TraceLevel, ExecutionTrace
-from .persistence import PersistentEngine, RunState, create_persistent_engine
 from .composite import (
     CompositeComponent,
     load_composite,
@@ -33,6 +32,11 @@ from .validation import (
     ValidationMessage,
     validate_plan,
 )
+
+# Aliases for "flow" terminology (plan → flow)
+FlowValidator = PlanValidator
+validate_flow = validate_plan
+FlowInputSpec = PlanInputSpec
 
 __all__ = [
     # Component
@@ -58,10 +62,7 @@ __all__ = [
     "DataflowEngine",
     "ExecutionResult",
     "PlanInputSpec",
-    # Persistence
-    "PersistentEngine",
-    "RunState",
-    "create_persistent_engine",
+    "FlowInputSpec",  # Alias
     # Tracing
     "ExecutionTracer",
     "TraceLevel",
@@ -74,7 +75,9 @@ __all__ = [
     "load_composites_from_directory",
     # Validation
     "PlanValidator",
+    "FlowValidator",  # Alias
     "ValidationReport",
     "ValidationMessage",
     "validate_plan",
+    "validate_flow",  # Alias
 ]

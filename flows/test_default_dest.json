@@ -1,0 +1,20 @@
+{
+  "name": "test_default_dest",
+  "description": "Test default destinations (collector=return, json_writer=file)",
+  "components": {
+    "data": {
+      "type": "source/literal",
+      "config": {"value": [10, 20, 30]}
+    },
+    "collector": {
+      "type": "sink/collector"
+    }
+  },
+  "flow": [
+    {"source": "data"},
+    {"loop": {"over": "data.value", "as": "n", "steps": [
+      {"call": "collector", "inputs": {"num": "{n}"}}
+    ]}},
+    {"sink": "collector"}
+  ]
+}

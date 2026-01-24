@@ -15,12 +15,19 @@ class CollectorSink(Component):
     Collect data items during execution.
 
     Call this component multiple times (e.g., in a loop) to accumulate
-    results. The collected items are available in the final outputs.
+    results. Configure destinations to control where results are written
+    when the sink is finalized.
+
+    Destinations:
+    - "return": Include in API response (ExecutionResult.returns)
+    - "file": Write to JSON file (requires path config)
+    - "console": Print to stdout
     """
 
     def __init__(self, instance_id: str, config: dict[str, Any]):
         super().__init__(instance_id, config)
         self._collected: list[dict[str, Any]] = []
+        self._finalized = False
 
     @classmethod
     def describe(cls) -> ComponentManifest:
@@ -32,7 +39,18 @@ class CollectorSink(Component):
                 "fields": ConfigSpec(
                     type="list",
                     required=False,
-                    description="List of field names to collect (optional, collects all if not specified)"
+                    description="Field names to collect (collects all if not specified)"
+                ),
+                "destinations": ConfigSpec(
+                    type="list",
+                    required=False,
+                    default=["return"],
+                    description="Where to write output: 'return', 'file', 'console'"
+                ),
+                "path": ConfigSpec(
+                    type="string",
+                    required=False,
+                    description="Output file path (required if 'file' in destinations)"
                 ),
             },
             inputs={
@@ -51,7 +69,6 @@ class CollectorSink(Component):
         )
 
     def validate(self, inputs: dict[str, Any]) -> "ValidationResult":
-        # Accept any inputs
         from core.component import ValidationResult
         return ValidationResult(valid=True)
 
@@ -72,10 +89,29 @@ class CollectorSink(Component):
         if item:  # Only add non-empty items
             self._collected.append(item)
 
-        return {
+        # Build result data
+        data = {
             "items": list(self._collected),
             "count": len(self._collected),
         }
+
+        # Write to destinations on finalization (sink step in flow)
+        # Finalization is detected by empty inputs (called via {"sink": "name"})
+        if not inputs and not self._finalized:
+            self._finalized = True
+            destinations = self.get_config("destinations", ["return"])
+
+            for dest in destinations:
+                if dest == "file":
+                    path = self.get_config("path", f"{self.instance_id}_results.json")
+                    context.write(data, to="file", path=path)
+                elif dest == "return":
+                    # Use instance_id as key in return space
+                    context.write({self.instance_id: data}, to="return")
+                elif dest == "console":
+                    context.write(data, to="console")
+
+        return data
 
     def get_collected(self) -> list[dict[str, Any]]:
         """Get all collected items (for external access)."""
@@ -84,3 +120,4 @@ class CollectorSink(Component):
     def clear(self) -> None:
         """Clear collected items."""
         self._collected.clear()
+        self._finalized = False

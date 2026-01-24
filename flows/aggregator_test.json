@@ -1,0 +1,126 @@
+{
+  "name": "aggregator_test",
+  "description": "Test aggregation and comparison components",
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "flows/samples/character_list.txt"
+      }
+    },
+
+    "ground_truth": {
+      "type": "source/key_value",
+      "config": {
+        "path": "flows/samples/character_ground_truth.txt",
+        "delimiter": "|",
+        "value_type": "boolean"
+      }
+    },
+
+    "lookup_expected": {
+      "type": "transform/lookup",
+      "config": {
+        "default": false
+      }
+    },
+
+    "compare": {
+      "type": "transform/compare",
+      "config": {
+        "mode": "equals",
+        "coerce_bool": true
+      }
+    },
+
+    "raw_results": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["group", "item", "expected", "simulated_answer", "match"]
+      }
+    },
+
+    "calculate_stats": {
+      "type": "transform/aggregator",
+      "config": {
+        "group_by": "group",
+        "match_field": "match"
+      }
+    },
+
+    "stats_output": {
+      "type": "sink/collector",
+      "config": {}
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+    {"source": "ground_truth"},
+
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "index": "idx",
+        "steps": [
+          {
+            "call": "lookup_expected",
+            "inputs": {
+              "dict": "{ground_truth.data}",
+              "key": "{item}"
+            },
+            "outputs": {
+              "value": "expected_value"
+            }
+          },
+
+          {
+            "call": "compare",
+            "inputs": {
+              "actual": "{expected_value}",
+              "expected": true
+            },
+            "outputs": {
+              "match": "is_match"
+            }
+          },
+
+          {
+            "call": "raw_results",
+            "inputs": {
+              "group": "test_group_1",
+              "item": "{item}",
+              "expected": "{expected_value}",
+              "simulated_answer": true,
+              "match": "{is_match}"
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "call": "calculate_stats",
+      "inputs": {
+        "items": "{raw_results.items}"
+      },
+      "outputs": {
+        "groups": "group_stats",
+        "summary": "overall_summary"
+      }
+    },
+
+    {
+      "call": "stats_output",
+      "inputs": {
+        "groups": "{group_stats}",
+        "summary": "{overall_summary}"
+      }
+    },
+
+    {"sink": "raw_results"},
+    {"sink": "stats_output"}
+  ]
+}

@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
-Dataflow Evaluation Runner
+Modular Flow Engine Runner
 
 Usage:
     python runner.py                     # Interactive mode
-    python runner.py <plan.json>         # Run a plan
-    python runner.py --list-plans        # List available plans
-    python runner.py --list-runs         # List resumable runs
+    python runner.py <flow.json>         # Run a flow
+    python runner.py --list-flows        # List available flows
 
 Options:
-    --dry-run       Validate plan without executing
+    --dry-run       Validate flow without executing
     --output DIR    Output directory (default: results/)
-    --run-id ID     Name for checkpoint/resume support
-    --resume [NAME] Resume a previous run
 """
 
 from __future__ import annotations
@@ -29,17 +26,17 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-def get_available_plans() -> list[dict]:
-    """Get all available plans with metadata."""
-    plans_dir = Path("plans")
-    if not plans_dir.exists():
+def get_available_flows() -> list[dict]:
+    """Get all available flows with metadata."""
+    flows_dir = Path("flows")
+    if not flows_dir.exists():
         return []
 
-    plans = []
-    for f in sorted(plans_dir.glob("*.json")):
+    flows = []
+    for f in sorted(flows_dir.glob("*.json")):
         try:
             data = json.loads(f.read_text())
-            plans.append({
+            flows.append({
                 "path": f,
                 "name": data.get("name", f.stem),
                 "description": data.get("description", "No description"),
@@ -47,12 +44,12 @@ def get_available_plans() -> list[dict]:
             })
         except (json.JSONDecodeError, IOError):
             continue
-    return plans
+    return flows
 
 
-def analyze_plan(plan_data: dict) -> dict:
-    """Analyze a plan and return useful metadata."""
-    components = plan_data.get("components", {})
+def analyze_flow(flow_data: dict) -> dict:
+    """Analyze a flow and return useful metadata."""
+    components = flow_data.get("components", {})
 
     # Count by category
     sources = []
@@ -88,7 +85,7 @@ def analyze_plan(plan_data: dict) -> dict:
                     if branch in step["conditional"]:
                         check_flow(step["conditional"][branch])
 
-    check_flow(plan_data.get("flow", []))
+    check_flow(flow_data.get("flow", []))
 
     return {
         "sources": sources,
@@ -135,10 +132,10 @@ def parse_input_args(input_args: list[str] | None) -> dict[str, Any]:
     return inputs
 
 
-def get_plan_inputs_schema(plan_data: dict) -> dict[str, dict]:
-    """Get the input schema from a plan dict."""
+def get_flow_inputs_schema(flow_data: dict) -> dict[str, dict]:
+    """Get the input schema from a flow dict."""
     schema = {}
-    for name, spec in plan_data.get("inputs", {}).items():
+    for name, spec in flow_data.get("inputs", {}).items():
         if isinstance(spec, dict):
             schema[name] = {
                 "type": spec.get("type", "string"),
@@ -153,14 +150,14 @@ def get_plan_inputs_schema(plan_data: dict) -> dict[str, dict]:
 
 
 def prompt_for_inputs(schema: dict[str, dict]) -> dict[str, Any]:
-    """Interactively prompt for plan inputs."""
+    """Interactively prompt for flow inputs."""
     inputs = {}
 
     required_inputs = [(k, v) for k, v in schema.items() if v["required"] and v["default"] is None]
     optional_inputs = [(k, v) for k, v in schema.items() if not v["required"] or v["default"] is not None]
 
     if required_inputs:
-        print("This plan requires the following inputs:\n")
+        print("This flow requires the following inputs:\n")
 
         for name, spec in required_inputs:
             type_hint = spec["type"]
@@ -200,176 +197,55 @@ def prompt_for_inputs(schema: dict[str, dict]) -> dict[str, Any]:
     return inputs
 
 
-def get_latest_resumable_run() -> tuple[str, Path] | None:
-    """Get the most recent resumable run, if any."""
-    runs_dir = Path("runs")
-    if not runs_dir.exists():
-        return None
-
-    run_folders = [
-        d for d in runs_dir.iterdir()
-        if d.is_dir() and not d.is_symlink() and (d / "state.jsonl").exists()
-    ]
-    if not run_folders:
-        return None
-
-    latest = max(run_folders, key=lambda d: d.stat().st_mtime)
-    return (latest.name, latest)
-
-
-def get_run_info(run_name: str) -> dict | None:
-    """Get info about a run from its results.json."""
-    run_path = Path("runs") / run_name
-    results_file = run_path / "results.json"
-
-    if not results_file.exists():
-        return None
-
-    try:
-        data = json.loads(results_file.read_text())
-        return {
-            "run_name": run_name,
-            "run_path": run_path,
-            "plan_name": data.get("plan_name"),
-            "success": data.get("success"),
-            "duration": data.get("duration_seconds"),
-        }
-    except (json.JSONDecodeError, IOError):
-        return None
-
-
-def find_plan_path(plan_name: str) -> Path | None:
-    """Find a plan file by name."""
-    plans = get_available_plans()
-    for p in plans:
-        if p["name"] == plan_name or p["path"].stem == plan_name:
-            return p["path"]
-    return None
-
-
-def resume_run(
-    run_name: str | None = None,
-    plan_path: Path | None = None,
-    output_mode: "OutputMode | None" = None,
-) -> int:
-    """
-    Resume a previous run.
-
-    Args:
-        run_name: Name of run to resume. If None, uses latest.
-        plan_path: Plan file path. If None, auto-detects from run.
-        output_mode: Output verbosity. If None, uses NORMAL.
-
-    Returns:
-        Exit code (0 = success)
-    """
-    from core import OutputMode as OM
-
-    # Find the run
-    if run_name is None:
-        latest = get_latest_resumable_run()
-        if not latest:
-            print("Error: No resumable runs found in runs/", file=sys.stderr)
-            return 1
-        run_name, run_path = latest
-        print(f"Resuming latest run: {run_name}")
-    else:
-        run_path = Path("runs") / run_name
-        if not run_path.exists():
-            print(f"Error: Run '{run_name}' not found in runs/", file=sys.stderr)
-            return 1
-        print(f"Resuming run: {run_name}")
-
-    # Find the plan
-    if plan_path is None:
-        run_info = get_run_info(run_name)
-        if run_info and run_info["plan_name"]:
-            plan_path = find_plan_path(run_info["plan_name"])
-
-        if not plan_path:
-            print(f"Error: Could not determine plan for run '{run_name}'", file=sys.stderr)
-            print("Specify the plan explicitly: python runner.py <plan.json> --resume", file=sys.stderr)
-            return 1
-
-    if output_mode is None:
-        output_mode = OM.NORMAL
-
-    setup_logging(output_mode)
-
-    return asyncio.run(run_plan(
-        plan_path,
-        dry_run=False,
-        output_mode=output_mode,
-        output_dir=run_path,
-        run_id=run_name,
-        resume=True,
-        db_hook=False,
-    ))
-
-
 def interactive_mode() -> int:
-    """Run interactive plan selection and execution."""
-    print("\n=== Dataflow Evaluation Runner ===\n")
+    """Run interactive flow selection and execution."""
+    print("\n=== Modular Flow Engine ===\n")
 
-    # Check for resumable runs
-    latest_run = get_latest_resumable_run()
-
-    # Get available plans
-    plans = get_available_plans()
-    if not plans:
-        print("No plans found in plans/ directory.")
+    # Get available flows
+    flows = get_available_flows()
+    if not flows:
+        print("No flows found in flows/ directory.")
         return 1
 
-    # Show resume option if available
-    if latest_run:
-        run_name, run_path = latest_run
-        print(f"  0. [Resume] {run_name}")
-        print()
-
-    # Show plans
-    print("Available plans:")
-    for i, plan in enumerate(plans, 1):
-        desc = plan["description"][:50] + "..." if len(plan["description"]) > 50 else plan["description"]
-        print(f"  {i:2}. {plan['name']:<25} {desc}")
+    # Show flows
+    print("Available flows:")
+    for i, flow in enumerate(flows, 1):
+        desc = flow["description"][:50] + "..." if len(flow["description"]) > 50 else flow["description"]
+        print(f"  {i:2}. {flow['name']:<25} {desc}")
 
     print()
 
-    # Select plan
+    # Select flow
     try:
-        prompt = f"Select plan [0-{len(plans)}]: " if latest_run else f"Select plan [1-{len(plans)} or name]: "
+        prompt = f"Select flow [1-{len(flows)} or name]: "
         selection = input(prompt).strip()
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
         return 0
 
-    # Handle resume option
-    if selection == "0" and latest_run:
-        run_name, _ = latest_run
-        return resume_run(run_name)
-
     # Parse selection
-    selected_plan = None
+    selected_flow = None
     if selection.isdigit():
         idx = int(selection) - 1
-        if 0 <= idx < len(plans):
-            selected_plan = plans[idx]
+        if 0 <= idx < len(flows):
+            selected_flow = flows[idx]
     else:
         # Search by name
-        for plan in plans:
-            if plan["name"] == selection or plan["path"].stem == selection:
-                selected_plan = plan
+        for flow in flows:
+            if flow["name"] == selection or flow["path"].stem == selection:
+                selected_flow = flow
                 break
 
-    if not selected_plan:
+    if not selected_flow:
         print(f"Invalid selection: {selection}")
         return 1
 
-    # Analyze plan
-    analysis = analyze_plan(selected_plan["data"])
+    # Analyze flow
+    analysis = analyze_flow(selected_flow["data"])
 
     print()
-    print(f"─── {selected_plan['name']} ───")
-    print(selected_plan["description"])
+    print(f"─── {selected_flow['name']} ───")
+    print(selected_flow["description"])
     print()
 
     # Check API requirements - only show if there's a problem
@@ -380,39 +256,23 @@ def interactive_mode() -> int:
             print()
 
     # Check for required inputs
-    input_schema = get_plan_inputs_schema(selected_plan["data"])
-    plan_inputs = {}
+    input_schema = get_flow_inputs_schema(selected_flow["data"])
+    flow_inputs = {}
     if input_schema:
-        plan_inputs = prompt_for_inputs(input_schema)
-        if plan_inputs is None:
+        flow_inputs = prompt_for_inputs(input_schema)
+        if flow_inputs is None:
             return 0  # User cancelled
 
-    # Collect options
-    run_id = None
-
-    # Suggest run-id for plans with loops (enables resume)
-    if analysis["has_loops"]:
-        try:
-            run_id_input = input("Name this run (enables resume if interrupted)? [blank to skip]: ").strip()
-            if run_id_input:
-                run_id = run_id_input
-        except (KeyboardInterrupt, EOFError):
-            print("\nCancelled.")
-            return 0
-        print()
-
     # Build the command for display at the end
-    cmd_parts = ["python runner.py", str(selected_plan["path"])]
-    for key, value in plan_inputs.items():
+    cmd_parts = ["python runner.py", str(selected_flow["path"])]
+    for key, value in flow_inputs.items():
         if isinstance(value, str) and " " in value:
             cmd_parts.append(f'--input {key}="{value}"')
         else:
             cmd_parts.append(f"--input {key}={value}")
-    if run_id:
-        cmd_parts.append(f"--run-id {run_id}")
 
-    # Determine output mode from plan
-    settings = selected_plan["data"].get("settings", {})
+    # Determine output mode from flow
+    settings = selected_flow["data"].get("settings", {})
     output_mode_str = settings.get("output_mode", "normal").lower()
     if output_mode_str == "quiet":
         output_mode = OutputMode.QUIET
@@ -423,22 +283,18 @@ def interactive_mode() -> int:
 
     setup_logging(output_mode)
 
-    # Run the plan
+    # Run the flow
     print("=" * 50)
-    print(f"Running {selected_plan['name']}...")
+    print(f"Running {selected_flow['name']}...")
     print("=" * 50)
     print()
 
-    exit_code = asyncio.run(run_plan(
-        selected_plan["path"],
+    exit_code = asyncio.run(run_flow(
+        selected_flow["path"],
         dry_run=False,
         output_mode=output_mode,
         output_dir=None,
-        plan_args=None,
-        run_id=run_id,
-        resume=False,
-        db_hook=False,
-        plan_inputs=plan_inputs,
+        flow_inputs=flow_inputs,
     ))
 
     # Show the command to run again
@@ -446,9 +302,6 @@ def interactive_mode() -> int:
     print("═" * 50)
     print("To run again:")
     print(f"  {' '.join(cmd_parts)}")
-    if run_id:
-        print(f"\nTo resume if interrupted:")
-        print(f"  python runner.py {selected_plan['path']} --resume {run_id}")
     print("═" * 50)
 
     return exit_code
@@ -460,10 +313,8 @@ from core import (
     ExecutionError,
     load_composites_from_directory,
     TraceLevel,
-    validate_plan,
+    validate_flow,
     OutputMode,
-    PersistentEngine,
-    create_persistent_engine,
 )
 
 
@@ -491,29 +342,25 @@ def setup_logging(output_mode: OutputMode) -> None:
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-async def run_plan(
-    plan_path: Path,
+async def run_flow(
+    flow_path: Path,
     dry_run: bool = False,
     output_mode: OutputMode = OutputMode.NORMAL,
     output_dir: Path | None = None,
-    plan_args: list[str] | None = None,
-    run_id: str | None = None,
-    resume: bool = False,
-    db_hook: bool = False,
-    plan_inputs: dict[str, Any] | None = None,
+    flow_inputs: dict[str, Any] | None = None,
 ) -> int:
-    """Run a plan and return exit code."""
+    """Run a flow and return exit code."""
     import logging
     logger = logging.getLogger(__name__)
 
-    # Load plan
-    logger.info(f"Loading plan: {plan_path}")
-    with open(plan_path, "r") as f:
-        plan = json.load(f)
+    # Load flow
+    logger.info(f"Loading flow: {flow_path}")
+    with open(flow_path, "r") as f:
+        flow = json.load(f)
 
-    plan_name = plan.get("name", plan_path.stem)
-    logger.info(f"Plan: {plan_name}")
-    logger.info(f"Description: {plan.get('description', 'No description')}")
+    flow_name = flow.get("name", flow_path.stem)
+    logger.info(f"Flow: {flow_name}")
+    logger.info(f"Description: {flow.get('description', 'No description')}")
 
     # Import components to register them
     import components  # noqa: F401
@@ -533,22 +380,13 @@ async def run_plan(
     else:
         trace_level = TraceLevel.ERRORS
 
-    # Create engine - use PersistentEngine for resume support or DB logging
-    if resume or db_hook or run_id:
-        engine = create_persistent_engine(
-            run_id=run_id,
-            trace_level=trace_level,
-            db_hook=db_hook,
-        )
-        logger.info(f"Using persistent engine (run_id: {engine.run_id})")
-    else:
-        engine = DataflowEngine(trace_level=trace_level)
+    # Create engine
+    engine = DataflowEngine(trace_level=trace_level)
+    engine.load_flow(flow)
 
-    engine.load_plan(plan)
-
-    # Set plan inputs if provided
-    if plan_inputs:
-        engine.set_inputs(plan_inputs)
+    # Set flow inputs if provided
+    if flow_inputs:
+        engine.set_inputs(flow_inputs)
 
     # Check for missing required inputs
     missing = engine.get_missing_inputs()
@@ -567,8 +405,8 @@ async def run_plan(
         logger.debug(f"  - {comp_id}: {manifest.type}")
 
     # Enhanced validation
-    logger.info("Validating plan...")
-    validation_report = validate_plan(plan)
+    logger.info("Validating flow...")
+    validation_report = validate_flow(flow)
 
     if validation_report.warnings:
         for warning in validation_report.warnings:
@@ -592,26 +430,17 @@ async def run_plan(
         logger.info("Dry run - skipping execution")
         return 0
 
-    # Set up output directory BEFORE execution so sinks can use it
+    # Set up output directory
     if output_dir:
         output_dir = Path(output_dir)
-    elif isinstance(engine, PersistentEngine):
-        # For persistent engine, use runs/<run_id> for consistency
-        output_dir = Path("runs") / engine.run_id
     else:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        output_dir = Path("results") / f"{plan_name}_{timestamp}"
+        output_dir = Path("results") / f"{flow_name}_{timestamp}"
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # For resume mode, check if we're actually resuming
-    if resume and isinstance(engine, PersistentEngine):
-        state_file = output_dir / "state.jsonl"
-        if state_file.exists():
-            logger.info(f"Resuming from existing state in {output_dir}")
-
-    # Execute with output directory and mode
-    logger.info("Executing plan...")
+    # Execute
+    logger.info("Executing flow...")
     result = await engine.execute(output_dir=output_dir, output_mode=output_mode)
 
     # Report results
@@ -629,26 +458,29 @@ async def run_plan(
             status = "✓ recovered" if err.recovered else "✗ fatal"
             print(f"  [{status}] {err.message}")
 
-    # Show outputs summary
-    if result.outputs:
-        print("\nOutputs:")
-        for sink_id, outputs in result.outputs.items():
-            if "items" in outputs:
-                print(f"  {sink_id}: {len(outputs['items'])} items collected")
-            elif "count" in outputs:
-                print(f"  {sink_id}: {outputs['count']} items")
+    # Show returns (from sinks via context.write())
+    if result.returns:
+        print("\nReturns:")
+        for key, value in result.returns.items():
+            if isinstance(value, dict) and "items" in value:
+                print(f"  {key}: {len(value['items'])} items")
+            elif isinstance(value, list):
+                print(f"  {key}: {len(value)} items")
+            elif isinstance(value, dict):
+                print(f"  {key}: {list(value.keys())}")
             else:
-                print(f"  {sink_id}: {list(outputs.keys())}")
+                val_str = str(value)[:50] + "..." if len(str(value)) > 50 else str(value)
+                print(f"  {key}: {val_str}")
 
-    # Save full results (output_dir already created above)
+    # Save full results
     results_file = output_dir / "results.json"
     with open(results_file, "w") as f:
         json.dump({
-            "plan_name": plan_name,
+            "flow_name": flow_name,
             "success": result.success,
             "duration_seconds": result.duration_seconds,
             "stats": result.stats,
-            "outputs": result.outputs,
+            "returns": result.returns,
             "errors": [
                 {
                     "type": e.error_type,
@@ -676,123 +508,65 @@ async def run_plan(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run dataflow evaluation plans",
+        description="Run modular flow engine workflows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    parser.add_argument("plan", type=Path, nargs="?", help="Path to plan JSON file")
+    parser.add_argument("flow", type=Path, nargs="?", help="Path to flow JSON file")
     parser.add_argument("--dry-run", action="store_true", help="Validate only")
     parser.add_argument("--output", "-o", type=Path, help="Output directory")
-
-    # Persistence options
     parser.add_argument(
-        "--run-id", "-r",
-        type=str,
-        help="Run ID for persistence (enables checkpoint/resume)"
-    )
-    parser.add_argument(
-        "--resume",
-        nargs="?",
-        const="__latest__",
-        default=None,
-        metavar="RUN_NAME",
-        help="Resume a previous run. No arg = latest run, or specify run name"
-    )
-    parser.add_argument(
-        "--db",
+        "--list-flows",
         action="store_true",
-        help="Log run to systems_history database"
-    )
-    parser.add_argument(
-        "--list-runs",
-        action="store_true",
-        help="List available runs that can be resumed"
-    )
-    parser.add_argument(
-        "--list-plans",
-        action="store_true",
-        help="List available plans"
+        help="List available flows"
     )
     parser.add_argument(
         "--input", "-i",
         action="append",
         metavar="KEY=VALUE",
         dest="inputs",
-        help="Provide plan input (can be repeated: -i file=data.txt -i count=10)"
+        help="Provide flow input (can be repeated: -i file=data.txt -i count=10)"
     )
 
-    # Remaining args passed to the plan
-    parser.add_argument("args", nargs="*", help="Arguments passed to the plan")
+    # Remaining args passed to the flow
+    parser.add_argument("args", nargs="*", help="Arguments passed to the flow")
 
     args = parser.parse_args()
 
-    # Handle --list-plans
-    if args.list_plans:
-        plans = get_available_plans()
-        if not plans:
-            print("No plans found in plans/ directory.")
+    # Handle --list-flows
+    if args.list_flows:
+        flows = get_available_flows()
+        if not flows:
+            print("No flows found in flows/ directory.")
             sys.exit(0)
 
-        print(f"{'Plan Name':<28} {'Description'}")
+        print(f"{'Flow Name':<28} {'Description'}")
         print("-" * 80)
-        for plan in plans:
-            desc = plan["description"][:48] + "..." if len(plan["description"]) > 48 else plan["description"]
-            print(f"{plan['name']:<28} {desc}")
+        for flow in flows:
+            desc = flow["description"][:48] + "..." if len(flow["description"]) > 48 else flow["description"]
+            print(f"{flow['name']:<28} {desc}")
         sys.exit(0)
 
-    # Handle --list-runs before plan validation
-    if args.list_runs:
-        runs_dir = Path("runs")
-        if not runs_dir.exists():
-            print("No runs/ directory found.")
-            sys.exit(0)
-
-        run_folders = [
-            d for d in runs_dir.iterdir()
-            if d.is_dir() and not d.is_symlink() and (d / "state.jsonl").exists()
-        ]
-        if not run_folders:
-            print("No resumable runs found.")
-            sys.exit(0)
-
-        # Sort by modification time (most recent first)
-        run_folders.sort(key=lambda d: d.stat().st_mtime, reverse=True)
-
-        print(f"{'Run Name':<30} {'Last Modified':<20} {'State File Size'}")
-        print("-" * 70)
-        for run in run_folders:
-            mtime = datetime.fromtimestamp(run.stat().st_mtime)
-            state_file = run / "state.jsonl"
-            size = state_file.stat().st_size
-            size_str = f"{size:,} bytes" if size < 1024 else f"{size/1024:.1f} KB"
-            print(f"{run.name:<30} {mtime.strftime('%Y-%m-%d %H:%M'):<20} {size_str}")
-        sys.exit(0)
-
-    # Handle --resume without a plan (auto-detect plan from run)
-    if args.resume is not None and args.plan is None:
-        run_name = None if args.resume == "__latest__" else args.resume
-        sys.exit(resume_run(run_name))
-
-    # Plan is required for all other operations
-    # If no plan and interactive terminal, launch interactive mode
-    if args.plan is None:
+    # Flow is required for all other operations
+    # If no flow and interactive terminal, launch interactive mode
+    if args.flow is None:
         if sys.stdin.isatty():
             sys.exit(interactive_mode())
         else:
-            print("Error: Plan file is required (non-interactive mode)", file=sys.stderr)
+            print("Error: Flow file is required (non-interactive mode)", file=sys.stderr)
             parser.print_usage()
             sys.exit(1)
 
-    if not args.plan.exists():
-        print(f"Error: Plan file not found: {args.plan}", file=sys.stderr)
+    if not args.flow.exists():
+        print(f"Error: Flow file not found: {args.flow}", file=sys.stderr)
         sys.exit(1)
 
-    # Load plan to read settings
-    with open(args.plan, "r") as f:
-        plan = json.load(f)
+    # Load flow to read settings
+    with open(args.flow, "r") as f:
+        flow = json.load(f)
 
-    # Get output mode from plan settings (default: normal)
-    settings = plan.get("settings", {})
+    # Get output mode from flow settings (default: normal)
+    settings = flow.get("settings", {})
     output_mode_str = settings.get("output_mode", "normal").lower()
     if output_mode_str == "quiet":
         output_mode = OutputMode.QUIET
@@ -803,42 +577,15 @@ def main():
 
     setup_logging(output_mode)
 
-    # Handle resume with explicit plan
-    if args.resume is not None:
-        run_name = None if args.resume == "__latest__" else args.resume
+    # Parse flow inputs
+    flow_inputs = parse_input_args(args.inputs)
 
-        # Validate run exists and set up for run_plan
-        if run_name is None:
-            latest = get_latest_resumable_run()
-            if not latest:
-                print("Error: No resumable runs found", file=sys.stderr)
-                sys.exit(1)
-            args.run_id = latest[0]
-            print(f"Resuming latest run: {args.run_id}")
-        else:
-            args.run_id = run_name
-            if not (Path("runs") / run_name).exists():
-                print(f"Error: Run '{run_name}' not found in runs/", file=sys.stderr)
-                sys.exit(1)
-            print(f"Resuming run: {args.run_id}")
-
-        args.resume = True
-    else:
-        args.resume = False
-
-    # Parse plan inputs
-    plan_inputs = parse_input_args(args.inputs)
-
-    exit_code = asyncio.run(run_plan(
-        args.plan,
+    exit_code = asyncio.run(run_flow(
+        args.flow,
         dry_run=args.dry_run,
         output_mode=output_mode,
         output_dir=args.output,
-        plan_args=args.args,
-        run_id=args.run_id,
-        resume=args.resume,
-        db_hook=args.db,
-        plan_inputs=plan_inputs,
+        flow_inputs=flow_inputs,
     ))
 
     sys.exit(exit_code)

@@ -1,0 +1,21 @@
+# Test characters for child detection
+# Mix of known (from training) and new characters
+
+# Known children (should flag)
+anya_forger_(spy_x_family)
+illyasviel_von_einzbern_(fate)
+komeiji_koishi_(touhou_project)
+
+# Known non-children (should NOT flag)
+kousaka_kirino_(oreimo)
+kotatsu_tamaki_(fire_force)
+
+# New test characters
+hatsune_miku_(vocaloid)
+rem_(re_zero)
+saber_(fate_stay_night)
+naruto_uzumaki_(naruto)
+goku_(dragon_ball)
+pikachu_(pokemon)
+sailor_moon_(sailor_moon)
+nezuko_kamado_(demon_slayer)

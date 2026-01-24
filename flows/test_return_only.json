@@ -1,0 +1,23 @@
+{
+  "name": "test_return_only",
+  "description": "Test return-only destination",
+  "components": {
+    "data": {
+      "type": "source/literal",
+      "config": {"value": ["a", "b", "c"]}
+    },
+    "collector": {
+      "type": "sink/collector",
+      "config": {
+        "destinations": ["return"]
+      }
+    }
+  },
+  "flow": [
+    {"source": "data"},
+    {"loop": {"over": "data.value", "as": "item", "steps": [
+      {"call": "collector", "inputs": {"letter": "{item}"}}
+    ]}},
+    {"sink": "collector"}
+  ]
+}

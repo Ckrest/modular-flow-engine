@@ -1,0 +1,48 @@
+{
+  "description": "Filter categories for female-solo content curation",
+  "categories": {
+    "male_presence": {
+      "description": "Male anatomy, male characters, or heterosexual acts",
+      "examples": ["penis", "balls", "1boy", "hetero", "clothed_male_nude_female", "cum_on_face", "fellatio", "handjob"],
+      "note": "Blocks any male involvement in the image"
+    },
+    "anal_content": {
+      "description": "Anal-related content of any kind",
+      "examples": ["anal", "anus", "anal_sex", "anal_fingering", "spread_anus"],
+      "note": "All anal content is filtered regardless of context"
+    },
+    "non_human_partner": {
+      "description": "Monster, creature, or non-human sexual partners",
+      "examples": ["tentacles", "tentacle_sex", "furry", "demon", "orc", "monster", "slime"],
+      "note": "Fantasy RACES like elf are OK; fantasy CREATURES are not"
+    },
+    "violence_gore": {
+      "description": "Blood, wounds, death, or violent content",
+      "examples": ["blood", "gore", "corpse", "dismemberment", "stab", "cuts", "deep_wound"],
+      "note": "Any violence or injury-related content"
+    },
+    "bodily_waste": {
+      "description": "Excrement, urine, vomit, or related fetishes",
+      "examples": ["scat", "poop", "urine", "peeing", "vomit", "watersports", "enema"],
+      "note": "All waste-related content"
+    },
+    "extreme_fetish": {
+      "description": "Extreme body modification, inflation, or forced scenarios",
+      "examples": ["inflation", "breast_expansion", "cum_inflation", "forced_lactation", "milking_machine"],
+      "note": "Regular lactation is OK; forced/mechanical is not"
+    },
+    "pubic_hair": {
+      "description": "Pubic hair visibility or styling",
+      "examples": ["pubic_hair", "female_pubic_hair", "shaved_pussy", "excessive_pubic_hair"],
+      "note": "All pubic hair related tags"
+    }
+  },
+  "allowed_explicit": [
+    "Female anatomy (breasts, nipples, pussy)",
+    "Female masturbation and orgasm",
+    "BDSM/bondage with female subjects",
+    "Sex toys used by females",
+    "Regular lactation",
+    "Fantasy races (elf, devil, angel)"
+  ]
+}

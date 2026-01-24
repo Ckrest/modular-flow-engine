@@ -1,0 +1,90 @@
+{
+  "name": "simple_test",
+  "description": "Simple test plan to verify system execution without API calls",
+
+  "components": {
+    "items": {
+      "type": "source/text_list",
+      "config": {
+        "path": "flows/samples/character_list.txt"
+      }
+    },
+
+    "ground_truth": {
+      "type": "source/key_value",
+      "config": {
+        "path": "flows/samples/character_ground_truth.txt",
+        "delimiter": "|",
+        "value_type": "boolean"
+      }
+    },
+
+    "format_item": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "lookup_value": {
+      "type": "transform/lookup",
+      "config": {
+        "default": "UNKNOWN"
+      }
+    },
+
+    "results": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["item", "formatted", "ground_truth_value"]
+      }
+    }
+  },
+
+  "flow": [
+    {"source": "items"},
+    {"source": "ground_truth"},
+
+    {
+      "loop": {
+        "over": "items.items",
+        "as": "item",
+        "index": "idx",
+        "steps": [
+          {
+            "call": "format_item",
+            "inputs": {
+              "template": "Item #{idx}: {item}",
+              "item": "{item}",
+              "idx": "{idx}"
+            },
+            "outputs": {
+              "result": "formatted_text"
+            }
+          },
+
+          {
+            "call": "lookup_value",
+            "inputs": {
+              "dict": "{ground_truth.data}",
+              "key": "{item}"
+            },
+            "outputs": {
+              "value": "truth_value",
+              "found": "was_found"
+            }
+          },
+
+          {
+            "call": "results",
+            "inputs": {
+              "item": "{item}",
+              "formatted": "{formatted_text}",
+              "ground_truth_value": "{truth_value}"
+            }
+          }
+        ]
+      }
+    },
+
+    {"sink": "results"}
+  ]
+}

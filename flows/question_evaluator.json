@@ -1,0 +1,254 @@
+{
+  "name": "question_evaluator",
+  "description": "Evaluate which questions best identify target characters by comparing model responses against ground truth",
+
+  "components": {
+    "api_key": {
+      "type": "source/api_key",
+      "config": {
+        "key_name": "openrouter",
+        "required": true
+      }
+    },
+
+    "characters": {
+      "type": "source/text_list",
+      "config": {
+        "path": "flows/samples/character_list.txt"
+      }
+    },
+
+    "ground_truth": {
+      "type": "source/key_value",
+      "config": {
+        "path": "flows/samples/character_ground_truth.txt",
+        "delimiter": "|",
+        "value_type": "boolean"
+      }
+    },
+
+    "questions": {
+      "type": "source/text_list",
+      "config": {
+        "path": "flows/samples/questions.txt"
+      }
+    },
+
+    "system_instruction": {
+      "type": "source/literal",
+      "config": {
+        "value": "You are a precise visual classifier. Answer ONLY 'yes' or 'no' to the question about the character's appearance. No explanations."
+      }
+    },
+
+    "build_prompt": {
+      "type": "transform/template",
+      "config": {}
+    },
+
+    "ask_model": {
+      "type": "transform/openrouter",
+      "config": {
+        "model": "meta-llama/llama-3.3-70b-instruct",
+        "temperature": 0.0,
+        "max_tokens": 10
+      }
+    },
+
+    "parse_answer": {
+      "type": "transform/yesno_parser",
+      "config": {
+        "strict": false
+      }
+    },
+
+    "lookup_expected": {
+      "type": "transform/lookup",
+      "config": {
+        "default": null
+      }
+    },
+
+    "check_correct": {
+      "type": "transform/compare",
+      "config": {
+        "mode": "equals",
+        "coerce_bool": true
+      }
+    },
+
+    "raw_results": {
+      "type": "sink/collector",
+      "config": {
+        "fields": ["question_index", "question", "character", "answer", "is_yes", "expected", "match", "confidence", "raw_response"]
+      }
+    },
+
+    "calculate_stats": {
+      "type": "transform/aggregator",
+      "config": {
+        "group_by": "question_index",
+        "match_field": "match"
+      }
+    },
+
+    "question_stats": {
+      "type": "sink/collector",
+      "config": {}
+    },
+
+    "report": {
+      "type": "sink/report_writer",
+      "config": {
+        "path": "results/report.md",
+        "title": "Question Evaluation Report",
+        "show_all_results": false,
+        "max_sample_results": 15
+      }
+    },
+
+    "csv_export": {
+      "type": "sink/csv_writer",
+      "config": {
+        "path": "results/raw_results.csv",
+        "columns": ["question_index", "character", "question", "answer", "is_yes", "expected", "match"]
+      }
+    }
+  },
+
+  "flow": [
+    {"source": "api_key"},
+    {"source": "characters"},
+    {"source": "ground_truth"},
+    {"source": "questions"},
+    {"source": "system_instruction"},
+
+    {
+      "loop": {
+        "over": "questions.items",
+        "as": "question_template",
+        "index": "question_index",
+        "steps": [
+          {
+            "loop": {
+              "over": "characters.items",
+              "as": "item",
+              "steps": [
+                {
+                  "call": "build_prompt",
+                  "inputs": {
+                    "template": "{question_template}",
+                    "item": "{item}"
+                  },
+                  "outputs": {
+                    "result": "final_prompt"
+                  }
+                },
+
+                {
+                  "call": "ask_model",
+                  "inputs": {
+                    "prompt": "{final_prompt}",
+                    "system_prompt": "{system_instruction.value}",
+                    "api_key": "{api_key.key}"
+                  },
+                  "outputs": {
+                    "response": "model_response"
+                  }
+                },
+
+                {
+                  "call": "parse_answer",
+                  "inputs": {
+                    "text": "{model_response}"
+                  },
+                  "outputs": {
+                    "answer": "parsed_answer",
+                    "is_yes": "is_yes",
+                    "confidence": "confidence"
+                  }
+                },
+
+                {
+                  "call": "lookup_expected",
+                  "inputs": {
+                    "dict": "{ground_truth.data}",
+                    "key": "{item}"
+                  },
+                  "outputs": {
+                    "value": "expected_answer"
+                  }
+                },
+
+                {
+                  "call": "check_correct",
+                  "inputs": {
+                    "actual": "{is_yes}",
+                    "expected": "{expected_answer}"
+                  },
+                  "outputs": {
+                    "match": "is_correct"
+                  }
+                },
+
+                {
+                  "call": "raw_results",
+                  "inputs": {
+                    "question_index": "{question_index}",
+                    "question": "{final_prompt}",
+                    "character": "{item}",
+                    "answer": "{parsed_answer}",
+                    "is_yes": "{is_yes}",
+                    "expected": "{expected_answer}",
+                    "match": "{is_correct}",
+                    "confidence": "{confidence}",
+                    "raw_response": "{model_response}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "call": "calculate_stats",
+      "inputs": {
+        "items": "{raw_results.items}"
+      },
+      "outputs": {
+        "groups": "question_performance",
+        "summary": "overall_summary"
+      }
+    },
+
+    {
+      "call": "question_stats",
+      "inputs": {
+        "groups": "{question_performance}",
+        "summary": "{overall_summary}"
+      }
+    },
+
+    {
+      "call": "report",
+      "inputs": {
+        "raw_results": "{raw_results.items}",
+        "groups": "{question_performance}",
+        "summary": "{overall_summary}"
+      }
+    },
+
+    {
+      "call": "csv_export",
+      "inputs": {
+        "items": "{raw_results.items}"
+      }
+    }
+  ],
+
+  "error_handling": {
+    "default": "skip"
+  }
+}

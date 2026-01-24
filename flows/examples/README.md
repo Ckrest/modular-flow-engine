@@ -6,26 +6,26 @@ These examples demonstrate core patterns. Each is self-contained and uses generi
 
 ```bash
 # Basic loop - no inputs needed
-python runner.py plans/examples/01_basic_loop.json
+python runner.py flows/examples/01_basic_loop.json
 
 # With inputs - provide your own data
-python runner.py plans/examples/02_with_inputs.json \
-  --input data_file=plans/examples/sample_items.txt \
+python runner.py flows/examples/02_with_inputs.json \
+  --input data_file=flows/examples/sample_items.txt \
   --input prefix="[" --input suffix="]"
 
 # Transform chain - lookup metadata
-python runner.py plans/examples/03_transform_chain.json \
-  --input items_file=plans/examples/sample_items.txt \
-  --input metadata_file=plans/examples/sample_metadata.txt
+python runner.py flows/examples/03_transform_chain.json \
+  --input items_file=flows/examples/sample_items.txt \
+  --input metadata_file=flows/examples/sample_metadata.txt
 
 # Nested loops - cross-product
-python runner.py plans/examples/04_nested_loops.json \
-  --input items_file=plans/examples/sample_items.txt \
+python runner.py flows/examples/04_nested_loops.json \
+  --input items_file=flows/examples/sample_items.txt \
   --input 'options=["x","y","z"]'
 
 # Two-phase collection
-python runner.py plans/examples/05_two_phase.json \
-  --input data_file=plans/examples/sample_items.txt
+python runner.py flows/examples/05_two_phase.json \
+  --input data_file=flows/examples/sample_items.txt
 ```
 
 ## Examples Overview

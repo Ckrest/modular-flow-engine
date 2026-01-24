@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -18,13 +17,18 @@ class JsonWriterSink(Component):
     Write collected data to a JSON file.
 
     Can be called multiple times to accumulate data, then writes
-    all data when finalize() is called (or on final sink step).
+    all data when the sink is finalized.
+
+    Destinations:
+    - "file": Write to JSON file (default, always enabled)
+    - "return": Also include in API response
+    - "console": Also print to stdout
     """
 
     def __init__(self, instance_id: str, config: dict[str, Any]):
         super().__init__(instance_id, config)
         self._collected: list[dict[str, Any]] = []
-        self._written = False
+        self._finalized = False
 
     @classmethod
     def describe(cls) -> ComponentManifest:
@@ -47,6 +51,12 @@ class JsonWriterSink(Component):
                     type="boolean",
                     default=True,
                     description="Include execution metadata"
+                ),
+                "destinations": ConfigSpec(
+                    type="list",
+                    required=False,
+                    default=["file"],
+                    description="Where to write output: 'file' (default), 'return', 'console'"
                 ),
             },
             inputs={},
@@ -75,16 +85,9 @@ class JsonWriterSink(Component):
         if inputs:
             self._collected.append(dict(inputs))
 
-        # Write to file
-        configured_path = Path(self.get_config("path"))
-        pretty = self.get_config("pretty", True)
+        # Get configured path (context.write will resolve against output_dir)
+        configured_path = self.get_config("path")
         include_metadata = self.get_config("include_metadata", True)
-
-        # Use context output_dir if available, otherwise use configured path as-is
-        if context.output_dir and not configured_path.is_absolute():
-            path = context.output_dir / configured_path.name
-        else:
-            path = configured_path
 
         # Build output structure
         output = {
@@ -97,17 +100,23 @@ class JsonWriterSink(Component):
                 "count": len(self._collected),
             }
 
-        # Ensure parent directory exists
-        path.parent.mkdir(parents=True, exist_ok=True)
+        # Write to destinations on finalization
+        if not inputs and not self._finalized:
+            self._finalized = True
+            destinations = self.get_config("destinations", ["file"])
 
-        # Write file
-        with open(path, "w", encoding="utf-8") as f:
-            if pretty:
-                json.dump(output, f, indent=2, ensure_ascii=False)
-            else:
-                json.dump(output, f, ensure_ascii=False)
+            for dest in destinations:
+                if dest == "file":
+                    context.write(output, to="file", path=configured_path)
+                elif dest == "return":
+                    context.write({self.instance_id: output}, to="return")
+                elif dest == "console":
+                    context.write(output, to="console")
 
-        self._written = True
+        # Compute actual path for return value
+        path = Path(configured_path)
+        if context.output_dir and not path.is_absolute():
+            path = context.output_dir / path
 
         return {
             "path": str(path),
