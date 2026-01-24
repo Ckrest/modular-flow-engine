@@ -1,6 +1,0 @@
-# Example character list
-# Add your test characters here, one per line
-
-Character A
-Character B
-Character C

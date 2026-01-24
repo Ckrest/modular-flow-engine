@@ -17,11 +17,11 @@ results/
 # Checkpoint state (per run)
 runs/
 
-# User-specific plans and data (not distributable)
-# Keep plans/examples/ tracked (distributable)
-plans/local/
-plans/samples/
-plans/*.json
+# User-specific flows and data (not distributable)
+# Keep flows/examples/ tracked (distributable)
+flows/local/
+flows/samples/
+flows/*.json
 
 # IDE
 .idea/
