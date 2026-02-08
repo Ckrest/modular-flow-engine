@@ -40,7 +40,6 @@ The flow engine includes an HTTP service for programmatic access:
 ```bash
 # Start the service
 python server.py                    # Default port 9847
-python server.py --port 8080        # Custom port
 ```
 
 ### API Endpoints

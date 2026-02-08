@@ -504,12 +504,52 @@ async def run_flow(
     return 0 if result.success else 1
 
 
+def _emit_json(payload: dict) -> None:
+    """Print JSON to stdout for introspection flags."""
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _handle_introspection(args: argparse.Namespace) -> int | None:
+    """Handle introspection flags, returning exit code or None to continue."""
+    from .config import config_defaults, config_schema, validate_config_file, load_config
+
+    if args.print_defaults:
+        _emit_json(config_defaults())
+        return 0
+
+    if args.print_config_schema:
+        _emit_json(config_schema())
+        return 0
+
+    if args.validate_config:
+        errors = validate_config_file()
+        if errors:
+            for error in errors:
+                print(error, file=sys.stderr)
+            return 1
+        return 0
+
+    if args.print_resolved:
+        _emit_json(load_config())
+        return 0
+
+    return None
+
+
 def main():
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         description="Run modular flow engine workflows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
+    parser.add_argument("--version", action="version", version=f"modular-flow-engine {__version__}")
+    parser.add_argument("--print-defaults", action="store_true", help="Print default configuration as JSON and exit")
+    parser.add_argument("--print-config-schema", action="store_true", help="Print configuration schema as JSON and exit")
+    parser.add_argument("--validate-config", action="store_true", help="Validate configuration and exit")
+    parser.add_argument("--print-resolved", action="store_true", help="Print resolved configuration as JSON and exit")
+
     parser.add_argument("flow", type=Path, nargs="?", help="Path to flow JSON file")
     parser.add_argument("--dry-run", action="store_true", help="Validate only")
     parser.add_argument("--output", "-o", type=Path, help="Output directory")
@@ -530,6 +570,11 @@ def main():
     parser.add_argument("args", nargs="*", help="Arguments passed to the flow")
 
     args = parser.parse_args()
+
+    # Handle introspection flags first
+    result = _handle_introspection(args)
+    if result is not None:
+        sys.exit(result)
 
     # Handle --list-flows
     if args.list_flows:
