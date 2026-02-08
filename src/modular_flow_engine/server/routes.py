@@ -266,13 +266,7 @@ async def _execute_flow(
     inputs: dict[str, Any],
 ) -> FlowExecuteResponse:
     """Execute a flow and return results."""
-    import sys
-    from pathlib import Path
-
-    # Ensure core is importable
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-
-    from core import DataflowEngine, TraceLevel, OutputMode
+    from ..core import DataflowEngine, TraceLevel, OutputMode
 
     engine = DataflowEngine(trace_level=TraceLevel.ERRORS)
     engine.load_flow(data)
@@ -324,7 +318,7 @@ async def _execute_flow_background(
 @router.get("/components", response_model=ComponentListResponse, tags=["Components"])
 async def list_components() -> ComponentListResponse:
     """List all available component types by category."""
-    from core import ComponentRegistry
+    from ..core import ComponentRegistry
 
     registry = ComponentRegistry.get_instance()
     all_types = registry.list_types()
@@ -348,7 +342,7 @@ async def list_components() -> ComponentListResponse:
 @router.get("/components/{category}", tags=["Components"])
 async def list_components_by_category(category: str) -> dict:
     """List components in a specific category."""
-    from core import ComponentRegistry
+    from ..core import ComponentRegistry
 
     registry = ComponentRegistry.get_instance()
     all_types = registry.list_types()
@@ -368,7 +362,7 @@ async def list_components_by_category(category: str) -> dict:
 @router.get("/components/{category}/{name}/schema", response_model=ComponentSchema, tags=["Components"])
 async def get_component_schema(category: str, name: str) -> ComponentSchema:
     """Get full component manifest/schema."""
-    from core import ComponentRegistry
+    from ..core import ComponentRegistry
 
     comp_type = f"{category}/{name}"
     registry = ComponentRegistry.get_instance()
@@ -415,7 +409,7 @@ async def get_component_schema(category: str, name: str) -> ComponentSchema:
 @router.get("/docs/components", tags=["System"])
 async def get_component_docs() -> dict:
     """Get generated component documentation in markdown."""
-    from core import ComponentRegistry
+    from ..core import ComponentRegistry
 
     registry = ComponentRegistry.get_instance()
     docs = registry.generate_docs()

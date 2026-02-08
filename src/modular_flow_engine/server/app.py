@@ -30,12 +30,10 @@ async def lifespan(app: FastAPI):
     _start_time = time.time()
 
     # Add components import to register them
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    import components  # noqa: F401
+    from .. import components  # noqa: F401
 
     # Load composites
-    from core import load_composites_from_directory
+    from ..core import load_composites_from_directory
     composites_dir = Path(__file__).parent.parent / "composites"
     if composites_dir.exists():
         load_composites_from_directory(composites_dir)

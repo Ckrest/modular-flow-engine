@@ -69,7 +69,7 @@ class CollectorSink(Component):
         )
 
     def validate(self, inputs: dict[str, Any]) -> "ValidationResult":
-        from core.component import ValidationResult
+        from ...core.component import ValidationResult
         return ValidationResult(valid=True)
 
     async def execute(
