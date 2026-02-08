@@ -33,7 +33,27 @@ flows/*.json
 .DS_Store
 Thumbs.db
 
+# Build artifacts
+build/
+dist/
+
+# Logs and databases
+*.log
+*.db
+*.sqlite3
+
+# Serialized data
+*.pkl
+*.pt
+
+# Environment
+.env
+
+# Configurable trait
+config.local.yaml
+
 # Systems-specific files (tracked by vcsh systems, not this repo)
 manifest.yaml
 NOTES.md
 CLAUDE.md
+trait_*.yaml

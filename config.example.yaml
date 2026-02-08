@@ -1,0 +1,16 @@
+# Modular Flow Engine Configuration
+#
+# Copy to config.local.yaml and customize.
+
+data_dir: ~/.local/share/modular-flow-engine
+cache_dir: ~/.cache/modular-flow-engine
+
+# HTTP API server settings
+server:
+  host: 0.0.0.0
+  port: 9847
+
+# Flow execution settings
+execution:
+  timeout: 300
+  max_concurrent: 4
