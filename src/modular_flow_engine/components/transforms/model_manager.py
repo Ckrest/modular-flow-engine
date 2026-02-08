@@ -7,10 +7,10 @@ from typing import Any
 
 import httpx
 
-from core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
-from core.context import ExecutionContext
-from core.errors import ErrorProtocol
-from core.registry import register_component
+from ...core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
+from ...core.context import ExecutionContext
+from ...core.errors import ErrorProtocol
+from ...core.registry import register_component
 
 
 @register_component("transform/model_manager")

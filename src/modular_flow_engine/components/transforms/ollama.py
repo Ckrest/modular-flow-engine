@@ -1,63 +1,67 @@
-"""OpenRouter LLM transform component."""
+"""Ollama LLM transform component for local model inference."""
 
 from __future__ import annotations
 
-import asyncio
 import os
 import time
 from typing import Any
 
 import httpx
 
-from core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
-from core.context import ExecutionContext
-from core.errors import ErrorProtocol
-from core.registry import register_component
+from ...core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
+from ...core.context import ExecutionContext
+from ...core.errors import ErrorProtocol
+from ...core.registry import register_component
 
 
-@register_component("transform/openrouter")
-class OpenRouterTransform(Component):
+@register_component("transform/ollama")
+class OllamaTransform(Component):
     """
-    Call OpenRouter API to get LLM completions.
+    Call local Ollama API for LLM completions.
 
-    This component supports any field the plan wants to pass - it doesn't
-    have hardcoded assumptions about what inputs mean.
+    Supports the Ollama generate and chat endpoints. Uses the chat endpoint
+    by default for message-based interactions.
     """
 
-    # Override default error protocol to retry on failures
+    # Retry on failures (Ollama may be loading model)
     error_protocol = ErrorProtocol(on_error="retry", max_retries=3, retry_delay=2.0)
 
     @classmethod
     def describe(cls) -> ComponentManifest:
         return ComponentManifest(
-            type="transform/openrouter",
-            description="Call OpenRouter API for LLM completions",
+            type="transform/ollama",
+            description="Call local Ollama for LLM completions",
             category="transform",
             config={
                 "model": ConfigSpec(
                     type="string",
                     required=False,
-                    description="OpenRouter model identifier (or use plan settings.model)"
+                    description="Ollama model name (e.g., llama3:8b, mistral)"
                 ),
-                "api_key": ConfigSpec(
+                "base_url": ConfigSpec(
                     type="string",
-                    required=False,
-                    description="API key (or use OPENROUTER_API_KEY env var)"
+                    default="http://localhost:11434",
+                    description="Ollama API base URL"
                 ),
                 "temperature": ConfigSpec(
                     type="float",
                     default=0.7,
-                    description="Sampling temperature"
+                    description="Sampling temperature (0.0-2.0)"
                 ),
-                "max_tokens": ConfigSpec(
+                "num_predict": ConfigSpec(
                     type="integer",
                     default=1024,
                     description="Maximum tokens to generate"
                 ),
                 "timeout": ConfigSpec(
                     type="float",
-                    default=60.0,
-                    description="Request timeout in seconds"
+                    default=120.0,
+                    description="Request timeout in seconds (models may need loading time)"
+                ),
+                "format": ConfigSpec(
+                    type="string",
+                    required=False,
+                    description="Response format: 'json' for JSON mode"
                 ),
             },
             inputs={
@@ -71,15 +75,15 @@ class OpenRouterTransform(Component):
                     required=False,
                     description="Optional system prompt"
                 ),
-                "api_key": InputSpec(
-                    type="string",
-                    required=False,
-                    description="API key (overrides config and env var)"
-                ),
                 "model": InputSpec(
                     type="string",
                     required=False,
                     description="Model to use (overrides config)"
+                ),
+                "format": InputSpec(
+                    type="string",
+                    required=False,
+                    description="Response format (overrides config)"
                 ),
             },
             outputs={
@@ -91,11 +95,15 @@ class OpenRouterTransform(Component):
                     type="string",
                     description="Model that was used"
                 ),
-                "usage": OutputSpec(
-                    type="dict",
-                    description="Token usage statistics"
+                "eval_count": OutputSpec(
+                    type="integer",
+                    description="Number of tokens generated"
                 ),
-                "finish_reason": OutputSpec(
+                "total_duration": OutputSpec(
+                    type="integer",
+                    description="Total processing time in nanoseconds"
+                ),
+                "done_reason": OutputSpec(
                     type="string",
                     description="Why generation stopped"
                 ),
@@ -116,56 +124,48 @@ class OpenRouterTransform(Component):
                 "  2. Component config 'model'\n"
                 "  3. Plan settings 'model'"
             )
+
+        base_url = self.get_config("base_url", "http://localhost:11434")
         temperature = self.get_config("temperature", 0.7)
-        max_tokens = self.get_config("max_tokens", 1024)
-        timeout = self.get_config("timeout", 60.0)
-
-        # API key priority: input > config > environment
-        api_key = (
-            inputs.get("api_key")
-            or self.get_config("api_key")
-            or os.environ.get("OPENROUTER_API_KEY")
-        )
-
-        if not api_key:
-            raise ValueError(
-                "No API key provided. Set via:\n"
-                "  1. Input from source/api_key component\n"
-                "  2. Component config 'api_key'\n"
-                "  3. OPENROUTER_API_KEY environment variable"
-            )
+        num_predict = self.get_config("num_predict", 1024)
+        timeout = self.get_config("timeout", 120.0)
+        format_mode = inputs.get("format") or self.get_config("format")
 
         prompt = inputs.get("prompt", "")
         system_prompt = inputs.get("system_prompt")
 
-        # Build messages
+        # Build messages for chat endpoint
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        # Make API call
+        # Build request payload
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": num_predict,
+            }
+        }
+
+        if format_mode:
+            payload["format"] = format_mode
+
         start_time = time.time()
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                }
+                f"{base_url}/api/chat",
+                json=payload
             )
 
             if response.status_code != 200:
                 error_text = response.text
                 raise RuntimeError(
-                    f"OpenRouter API error ({response.status_code}): {error_text}"
+                    f"Ollama API error ({response.status_code}): {error_text}"
                 )
 
             data = response.json()
@@ -173,18 +173,18 @@ class OpenRouterTransform(Component):
         elapsed_ms = (time.time() - start_time) * 1000
 
         # Extract response
-        choice = data.get("choices", [{}])[0]
-        message = choice.get("message", {})
+        message = data.get("message", {})
         response_text = message.get("content", "")
 
-        # Debug output for API calls
-        short_response = response_text[:30] + "..." if len(response_text) > 30 else response_text
-        model_short = model.split("/")[-1][:20]
-        self.debug(f"API: {model_short} → '{short_response}' ({elapsed_ms:.0f}ms)", context)
+        # Debug output
+        short_response = response_text[:50] + "..." if len(response_text) > 50 else response_text
+        model_short = model.split(":")[-1][:15] if ":" in model else model[:15]
+        self.debug(f"Ollama: {model_short} → '{short_response}' ({elapsed_ms:.0f}ms)", context)
 
         return {
             "response": response_text,
             "model": data.get("model", model),
-            "usage": data.get("usage", {}),
-            "finish_reason": choice.get("finish_reason", "unknown"),
+            "eval_count": data.get("eval_count", 0),
+            "total_duration": data.get("total_duration", 0),
+            "done_reason": data.get("done_reason", "unknown"),
         }

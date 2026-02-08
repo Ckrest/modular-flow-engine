@@ -15,8 +15,6 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure package is importable
-sys.path.insert(0, str(Path(__file__).parent))
 
 
 def main():
@@ -66,7 +64,7 @@ def main():
     print()
 
     uvicorn.run(
-        "server.app:create_app",
+        "modular_flow_engine.server.app:create_app",
         factory=True,
         host=args.host,
         port=args.port,

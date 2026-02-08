@@ -22,8 +22,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Add parent to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
 
 
 def get_available_flows() -> list[dict]:
@@ -307,7 +305,7 @@ def interactive_mode() -> int:
     return exit_code
 
 
-from core import (
+from .core import (
     DataflowEngine,
     ValidationError,
     ExecutionError,
@@ -363,7 +361,7 @@ async def run_flow(
     logger.info(f"Description: {flow.get('description', 'No description')}")
 
     # Import components to register them
-    import components  # noqa: F401
+    from . import components  # noqa: F401
 
     # Load composites from composites directory
     composites_dir = Path(__file__).parent / "composites"

@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-from core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
-from core.context import ExecutionContext
-from core.registry import register_component
+from ...core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
+from ...core.context import ExecutionContext
+from ...core.registry import register_component
 
 
 @register_component("transform/vote_aggregator")

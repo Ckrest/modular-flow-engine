@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
-from core.context import ExecutionContext
-from core.registry import register_component
+from ...core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec
+from ...core.context import ExecutionContext
+from ...core.registry import register_component
 
 
 @register_component("sink/json_writer")

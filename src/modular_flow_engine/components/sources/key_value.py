@@ -5,9 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from core.component import Component, ComponentManifest, ConfigSpec, OutputSpec
-from core.context import ExecutionContext
-from core.registry import register_component
+from ...core.component import Component, ComponentManifest, ConfigSpec, OutputSpec
+from ...core.context import ExecutionContext
+from ...core.registry import register_component
 
 
 @register_component("source/key_value")

@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec, ValidationResult
-from core.context import ExecutionContext
-from core.registry import register_component
+from ...core.component import Component, ComponentManifest, ConfigSpec, InputSpec, OutputSpec, ValidationResult
+from ...core.context import ExecutionContext
+from ...core.registry import register_component
 
 
 @register_component("source/api_key")
