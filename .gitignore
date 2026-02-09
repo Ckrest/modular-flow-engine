@@ -55,7 +55,6 @@ dist/
 # Configurable trait
 config.local.yaml
 
-# Systems-specific files (tracked by vcsh systems, not this repo)
 manifest.yaml
 NOTES.md
 CLAUDE.md

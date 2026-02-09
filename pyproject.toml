@@ -2,7 +2,10 @@
 name = "modular-flow-engine"
 version = "1.0.0"
 description = "Declarative dataflow engine for AI pipelines"
+readme = "README.md"
 requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "Ckrest"}]
 dependencies = [
     "httpx>=0.24",
     "fastapi>=0.100",
@@ -13,6 +16,9 @@ dependencies = [
 
 [project.scripts]
 flow-engine = "modular_flow_engine.runner:main"
+
+[project.urls]
+Repository = "https://github.com/Ckrest/modular-flow-engine"
 
 [build-system]
 requires = ["setuptools>=64"]
