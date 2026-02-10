@@ -23,6 +23,15 @@ flows/local/
 flows/samples/
 flows/*.json
 
+# Components: only base_ files are distributed
+src/modular_flow_engine/components/*/*.py
+!src/modular_flow_engine/components/*/__init__.py
+!src/modular_flow_engine/components/*/base_*.py
+
+# Composites: only base_ files are distributed
+src/modular_flow_engine/composites/*.json
+!src/modular_flow_engine/composites/base_*.json
+
 # IDE
 .idea/
 .vscode/
