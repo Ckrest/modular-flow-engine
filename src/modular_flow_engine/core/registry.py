@@ -184,13 +184,17 @@ def auto_discover_components(components_path: Path | str) -> list[str]:
 
     # Get the package name from path
     # Assumes structure like: .../components/sources/my_source.py
+    # We need to walk up from components_path to find the full Python package
     package_parts = []
     current = components_path
+
+    # Build package parts by walking up until we hit a directory without __init__.py
     while current.name and current.name != current.anchor:
         package_parts.insert(0, current.name)
-        if (current / "__init__.py").exists() or current == components_path:
-            break
         current = current.parent
+        # Stop if this parent doesn't have __init__.py (not part of Python package)
+        if not (current / "__init__.py").exists():
+            break
 
     base_package = ".".join(package_parts)
 

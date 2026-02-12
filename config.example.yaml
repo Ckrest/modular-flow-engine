@@ -2,8 +2,9 @@
 #
 # Copy to config.local.yaml and customize.
 
-data_dir: ~/.local/share/modular-flow-engine
-cache_dir: ~/.cache/modular-flow-engine
+# Storage (auto-detected for your platform, uncomment to override)
+# data_dir:
+# cache_dir:
 
 # HTTP API server settings
 server:

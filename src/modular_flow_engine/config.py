@@ -6,13 +6,15 @@ import copy
 from pathlib import Path
 from typing import Any, Optional
 
+from platformdirs import user_cache_dir, user_data_dir
+
 
 PACKAGE_ROOT = Path(__file__).parent.parent.parent
 LOCAL_CONFIG_PATH = PACKAGE_ROOT / "config.local.yaml"
 
 DEFAULT_CONFIG = {
-    "data_dir": "~/.local/share/modular-flow-engine",
-    "cache_dir": "~/.cache/modular-flow-engine",
+    "data_dir": user_data_dir("modular-flow-engine"),
+    "cache_dir": user_cache_dir("modular-flow-engine"),
     "server": {
         "host": "127.0.0.1",
         "port": 9847,

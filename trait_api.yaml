@@ -1,0 +1,4 @@
+# modular-flow-engine - api trait configuration
+
+ports:
+- 9847

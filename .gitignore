@@ -63,8 +63,3 @@ dist/
 
 # Configurable trait
 config.local.yaml
-
-manifest.yaml
-NOTES.md
-CLAUDE.md
-trait_*.yaml

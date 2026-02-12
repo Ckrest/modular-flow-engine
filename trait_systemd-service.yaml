@@ -1,0 +1,5 @@
+# modular-flow-engine - systemd-service trait configuration
+
+service: modular-flow-engine
+ports:
+- 9847

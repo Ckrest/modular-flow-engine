@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dce_state.json",
+  "title": "Dynamic Context Engine State Schema (Multi-Entity)",
+  "description": "Multi-entity state system for LLM roleplay with scene tracking and image generation support",
+
+  "type": "object",
+  "required": ["session_id", "scene_context", "entities", "metadata"],
+
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this chat session"
+    },
+
+    "scene_context": {
+      "type": "object",
+      "description": "Shared scene/environment state",
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "Current location in the narrative"
+        },
+        "lighting": {
+          "type": "string",
+          "description": "Current lighting conditions"
+        },
+        "ambiance": {
+          "type": "string",
+          "description": "Mood/atmosphere of the scene"
+        }
+      }
+    },
+
+    "entities": {
+      "type": "object",
+      "description": "Dictionary of tracked entities (characters)",
+      "additionalProperties": {
+        "$ref": "#/$defs/entity"
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "description": "State management metadata",
+      "properties": {
+        "active_entities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Names of entities currently in the scene"
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of last update"
+        },
+        "scene_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Current scene identifier (changes on scene_changed)"
+        },
+        "message_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of messages processed"
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "description": "A tracked character entity",
+      "required": ["type", "layer_a_persistent", "layer_b_scratchpad"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["user", "main_char", "npc"],
+          "description": "Entity type"
+        },
+        "layer_a_persistent": {
+          "type": "object",
+          "description": "Core visual truth - updated only when significance_score >= 7",
+          "properties": {
+            "visual_base": {
+              "type": "string",
+              "description": "Physical appearance description"
+            },
+            "outfit": {
+              "type": "string",
+              "description": "Current clothing/armor"
+            },
+            "status": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Active conditions (e.g., 'Wounded', 'Exhausted')"
+            },
+            "inventory_major": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Important/quest items"
+            }
+          }
+        },
+        "layer_b_scratchpad": {
+          "type": "object",
+          "description": "Transient visual state - updated every message, wiped on scene change",
+          "properties": {
+            "pose": {
+              "type": "string",
+              "default": "standing",
+              "description": "Current body pose"
+            },
+            "expression": {
+              "type": "string",
+              "default": "neutral",
+              "description": "Facial expression"
+            },
+            "holding_left": {
+              "type": "string",
+              "default": "empty",
+              "description": "What's held in left hand"
+            },
+            "holding_right": {
+              "type": "string",
+              "default": "empty",
+              "description": "What's held in right hand"
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "examples": [
+    {
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "scene_context": {
+        "location": "Throne Room",
+        "lighting": "dim torchlight",
+        "ambiance": "tense silence"
+      },
+      "entities": {
+        "Eldric": {
+          "type": "main_char",
+          "layer_a_persistent": {
+            "visual_base": "tall, silver hair, scar on left cheek",
+            "outfit": "plate armor",
+            "status": ["exhausted"],
+            "inventory_major": ["royal signet ring"]
+          },
+          "layer_b_scratchpad": {
+            "pose": "kneeling",
+            "expression": "defiant",
+            "holding_left": "empty",
+            "holding_right": "broken sword"
+          }
+        },
+        "User": {
+          "type": "user",
+          "layer_a_persistent": {
+            "visual_base": "not described",
+            "outfit": "",
+            "status": [],
+            "inventory_major": []
+          },
+          "layer_b_scratchpad": {
+            "pose": "standing",
+            "expression": "neutral",
+            "holding_left": "empty",
+            "holding_right": "empty"
+          }
+        },
+        "The_King": {
+          "type": "npc",
+          "layer_a_persistent": {
+            "visual_base": "elderly, white beard, stern face",
+            "outfit": "royal robes, golden crown",
+            "status": ["wounded"],
+            "inventory_major": []
+          },
+          "layer_b_scratchpad": {
+            "pose": "seated on throne",
+            "expression": "angry",
+            "holding_left": "empty",
+            "holding_right": "scepter"
+          }
+        }
+      },
+      "metadata": {
+        "active_entities": ["Eldric", "The_King"],
+        "last_updated": "2026-01-24T01:45:00Z",
+        "scene_id": "661f9511-f39c-42e5-b718-557766551111",
+        "message_count": 15
+      }
+    }
+  ]
+}

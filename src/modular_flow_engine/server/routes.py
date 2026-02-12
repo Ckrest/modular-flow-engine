@@ -27,8 +27,9 @@ router = APIRouter()
 
 
 def get_flows_dir() -> Path:
-    """Get the flows directory path."""
-    return Path(__file__).parent.parent / "flows"
+    """Get the flows directory path (at package root)."""
+    # From src/modular_flow_engine/server/routes.py, go up to package root
+    return Path(__file__).parent.parent.parent.parent / "flows"
 
 
 def load_flow_file(name: str) -> dict[str, Any]:

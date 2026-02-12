@@ -5,9 +5,11 @@ Maps to keys in config.example.yaml. Override via config.local.yaml.
 
 from pathlib import Path
 
-# Standard XDG directories
-data_dir = Path("~/.local/share/modular-flow-engine").expanduser()
-cache_dir = Path("~/.cache/modular-flow-engine").expanduser()
+from platformdirs import user_cache_dir, user_data_dir
+
+# Platform-appropriate directories (resolved by platformdirs)
+data_dir = Path(user_data_dir("modular-flow-engine"))
+cache_dir = Path(user_cache_dir("modular-flow-engine"))
 
 # Server defaults
 server_host = "127.0.0.1"
