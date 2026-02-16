@@ -1,4 +1,0 @@
-# modular-flow-engine - cli trait configuration
-
-entry_point: ./flow-engine
-runtime: python
