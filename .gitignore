@@ -48,6 +48,7 @@ pkg/
 # Build artifacts
 build/
 dist/
+*.egg-info/
 
 # Logs and databases
 *.log
